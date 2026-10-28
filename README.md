@@ -186,7 +186,9 @@ npm run selftest
 
 ## 후원
 
-RefBoard가 도움이 됐다면 커피 한 잔으로 응원해 주세요.
+RefBoard가 도움이 됐다면 커피 한 잔으로 응원해 주세요.<br>
+If RefBoard helps you, you can buy me a coffee.<br>
+RefBoard が役に立ったら、コーヒー 1 杯で応援してください。
 
 <a href="https://buymeacoffee.com/uho3865"><img src="https://img.shields.io/badge/Buy%20Me%20a%20Coffee-ffdd00?style=for-the-badge&logo=buy-me-a-coffee&logoColor=black" alt="Buy Me a Coffee"></a>
 
