@@ -75,11 +75,11 @@ function updateViewBadges(it) {
   const b = it.badges;
   if (!b) return;
   const on = [
-    it.flipH && ['mirror', '좌우 반전'],
-    it.flipV && ['flipV', '상하 반전'],
-    it.gray && ['gray', '흑백'],
-    it.crop && ['crop', '잘림'],
-    it.sync && ['link', 'Blender 타임라인에 맞춤'],
+    it.flipH && ['mirror', tr('좌우 반전')],
+    it.flipV && ['flipV', tr('상하 반전')],
+    it.gray && ['gray', tr('흑백')],
+    it.crop && ['crop', tr('잘림')],
+    it.sync && ['link', tr('Blender 타임라인에 맞춤')],
   ].filter(Boolean);
   b.innerHTML = on.map(([ic, t]) => `<span title="${t}">${icon(ic)}</span>`).join('');
   it.el.classList.toggle('has-view', on.length > 0);
@@ -94,14 +94,14 @@ function toggleFlip(it, axis) {
   remapShapes(it, from, viewState(it));
   applyVisual(it);
   markDirty();
-  toast(axis === 'flipH' ? (it.flipH ? '좌우 반전' : '좌우 반전 끔') : it.flipV ? '상하 반전' : '상하 반전 끔');
+  toast(axis === 'flipH' ? (it.flipH ? tr('좌우 반전') : tr('좌우 반전 끔')) : it.flipV ? tr('상하 반전') : tr('상하 반전 끔'));
 }
 
 function toggleGray(it) {
   it.gray = !it.gray;
   applyVisual(it);
   markDirty();
-  toast(it.gray ? '흑백' : '흑백 끔');
+  toast(it.gray ? tr('흑백') : tr('흑백 끔'));
 }
 
 // ---------- 자르기 ----------
@@ -150,7 +150,7 @@ function startCrop(it) {
   applyVisual(it);
   layoutItem(it);
   drawCropBox(it);
-  toast('자르기: 모서리를 끌어 영역을 정하고 Enter · Esc 취소', 2600);
+  toast(tr('자르기: 모서리를 끌어 영역을 정하고 Enter · Esc 취소'), 2600);
 }
 
 function endCropUi(it) {
@@ -169,7 +169,7 @@ function applyCrop(it) {
   if (!it?.cropEdit) return;
   const crop = endCropUi(it);
   setCrop(it, crop);
-  toast(isFullCrop(crop) ? '자르기 해제' : '잘랐습니다 (우클릭 ▸ 자르기 해제로 되돌림)');
+  toast(isFullCrop(crop) ? tr('자르기 해제') : tr('잘랐습니다 (우클릭 ▸ 자르기 해제로 되돌림)'));
 }
 
 function cancelCrop(it) {
@@ -183,7 +183,7 @@ function resetCrop(it) {
   if (it.cropEdit) cancelCrop(it);
   if (!it.crop) return;
   setCrop(it, null);
-  toast('자르기 해제');
+  toast(tr('자르기 해제'));
 }
 
 function buildCropUi(it) {
@@ -205,12 +205,12 @@ function buildCropUi(it) {
     };
     bar.append(b);
   };
-  mk('전체', '', () => {
+  mk(tr('전체'), '', () => {
     Object.assign(it.cropEdit, FULL_CROP);
     drawCropBox(it);
   });
-  mk('취소', '', () => cancelCrop(it));
-  mk('적용', 'primary', () => applyCrop(it));
+  mk(tr('취소'), '', () => cancelCrop(it));
+  mk(tr('적용'), 'primary', () => applyCrop(it));
   box.append(bar);
   // 바깥 어둡게: 항목 안에서만 (손잡이는 가장자리 밖으로 나와야 잡기 쉬워서 따로 잘라 둔다)
   const dim = h('div', 'cropdim');

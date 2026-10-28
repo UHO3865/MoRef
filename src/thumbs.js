@@ -9,6 +9,7 @@
 //  - 캐시 확인은 메모리 색인으로 (폴더 1500개를 열 때 파일 존재 확인 1500번을 없앰).
 //  - 화면에 보이는 카드(high)를 먼저, 근처 카드(low)는 나중에. 화면 밖으로 나간 대기 작업은 버린다.
 //  - 한 번 실패한 파일(코덱 미지원 등)은 기억해 두고 다시 시도하지 않는다.
+const { tr } = require('./i18n');
 const fs = require('fs');
 const path = require('path');
 const crypto = require('crypto');
@@ -118,11 +119,11 @@ function runFfmpeg(args) {
     proc.stderr.on('data', (d) => (stderr += d));
     proc.on('error', (e) => {
       clearTimeout(timer);
-      resolve({ ok: false, missing: e.code === 'ENOENT', error: e.code === 'ENOENT' ? 'ffmpeg 를 찾을 수 없음' : e.message });
+      resolve({ ok: false, missing: e.code === 'ENOENT', error: e.code === 'ENOENT' ? tr('ffmpeg 를 찾을 수 없음') : e.message });
     });
     proc.on('close', (code) => {
       clearTimeout(timer);
-      resolve({ ok: code === 0, stdout: Buffer.concat(out), timedOut, error: timedOut ? '시간 초과' : stderr.trim().split('\n').pop() });
+      resolve({ ok: code === 0, stdout: Buffer.concat(out), timedOut, error: timedOut ? tr('시간 초과') : stderr.trim().split('\n').pop() });
     });
   });
 }

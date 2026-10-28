@@ -15,40 +15,51 @@ function initAddonSetup() {
   rb.addon.onOffer((versions) => {
     const ic = h('span', 'ic-wrap');
     ic.innerHTML = icon('link');
-    bar.replaceChildren(ic, h('span', 'msg', `Blender ${versions.join(', ')} 에 RefBoard 애드온을 설치할까요? (타임라인 동기화 · 뷰포트에 영상 띄우기)`));
+    bar.replaceChildren(ic, h('span', 'msg', tr('Blender {0} 에 RefBoard 애드온을 설치할까요? (타임라인 동기화 · 뷰포트에 영상 띄우기)', versions.join(', '))));
     const btn = (label, cls, fn) => {
       const b = h('button', cls, label);
       b.onclick = fn;
       bar.append(b);
     };
-    btn('설치', 'primary', async () => {
+    btn(tr('설치'), 'primary', async () => {
       bar.hidden = true;
       await installBlenderAddon();
     });
-    btn('나중에', '', () => (bar.hidden = true));
-    btn('다시 묻지 않기', '', () => {
+    btn(tr('나중에'), '', () => (bar.hidden = true));
+    btn(tr('다시 묻지 않기'), '', () => {
       bar.hidden = true;
       rb.setSetting('addonPrompt', 'never');
     });
     bar.hidden = false;
   });
 
-  rb.addon.onUpdated((versions) => toast(`Blender ${versions.join(', ')} 의 RefBoard 애드온을 새 버전으로 바꿨습니다 — Blender 를 다시 켜면 적용됩니다`, 4000));
+  rb.addon.onUpdated((versions) => toast(tr('Blender {0} 의 RefBoard 애드온을 새 버전으로 바꿨습니다 — Blender 를 다시 켜면 적용됩니다', versions.join(', ')), 4000));
 
   $('#btnAddon').onclick = () => installBlenderAddon();
+  initLanguagePicker();
+}
+
+// 언어 바꾸기: 보드를 자동 저장한 뒤 메인 프로세스가 화면을 새 언어로 다시 연다
+function initLanguagePicker() {
+  const sel = $('#langSelect');
+  sel.value = app.settings.languageNow || 'ko';
+  sel.onchange = async () => {
+    await saveBeforeReload();
+    rb.setLanguage(sel.value);
+  };
 }
 
 async function installBlenderAddon() {
   const { results, running } = await rb.addon.install();
   const ok = results.filter((r) => r.ok).map((r) => r.version);
   const bad = results.filter((r) => !r.ok);
-  if (!results.length) toast('이 PC 에서 Blender 4.2 이상을 찾지 못했습니다', 3500);
+  if (!results.length) toast(tr('이 PC 에서 Blender 4.2 이상을 찾지 못했습니다'), 3500);
   else if (ok.length)
     toast(
-      `Blender ${ok.join(', ')} 에 애드온을 설치했습니다 — ${running ? 'Blender 를 껐다가 다시 켜면' : '다음에 Blender 를 켜면'} 자동으로 켜집니다`,
+      tr('Blender {0} 에 애드온을 설치했습니다 — {1} 자동으로 켜집니다', ok.join(', '), running ? tr('Blender 를 껐다가 다시 켜면') : tr('다음에 Blender 를 켜면')),
       5000
     );
-  if (bad.length) toast(`설치하지 못했습니다: ${bad.map((r) => `${r.version} (${r.error})`).join(', ')}`, 5000);
+  if (bad.length) toast(tr('설치하지 못했습니다: {0}', bad.map((r) => `${r.version} (${r.error})`).join(', ')), 5000);
   refreshAddonStatus();
 }
 
@@ -58,10 +69,10 @@ async function refreshAddonStatus() {
   if (!el) return;
   const st = await rb.addon.status();
   if (!st.blenders.length) {
-    el.textContent = 'Blender 4.2 이상을 찾지 못했습니다';
+    el.textContent = tr('Blender 4.2 이상을 찾지 못했습니다');
     return;
   }
   el.textContent = st.blenders
-    .map((b) => `Blender ${b.version}: ${b.installed ? (b.outdated ? `${fmtVer(b.installed)} (새 버전 ${fmtVer(st.bundled)} 있음)` : `설치됨 ${fmtVer(b.installed)}`) : '설치 안 됨'}`)
+    .map((b) => `Blender ${b.version}: ${b.installed ? (b.outdated ? tr('{0} (새 버전 {1} 있음)', fmtVer(b.installed), fmtVer(st.bundled)) : tr('설치됨 {0}', fmtVer(b.installed))) : tr('설치 안 됨')}`)
     .join(' · ');
 }

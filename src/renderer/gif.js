@@ -43,9 +43,9 @@ class GifPlayer {
 
   async _load(url) {
     try {
-      if (!('ImageDecoder' in window)) throw new Error('이 환경은 GIF 프레임 읽기를 지원하지 않습니다');
+      if (!('ImageDecoder' in window)) throw new Error(tr('이 환경은 GIF 프레임 읽기를 지원하지 않습니다'));
       const res = await fetch(url);
-      if (!res.ok) throw new Error('GIF 를 불러오지 못했습니다 (' + res.status + ')');
+      if (!res.ok) throw new Error(tr('GIF 를 불러오지 못했습니다 (') + res.status + ')');
       this.decoder = new ImageDecoder({ data: res.body, type: 'image/gif' });
       await this.decoder.tracks.ready;
       let i = 0;

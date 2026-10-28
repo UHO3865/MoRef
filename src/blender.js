@@ -15,6 +15,7 @@
 //   bg <JSON>                         카메라 배경 영상으로 넣기 {path, name, fps, frame, flipX, sync}
 //   ref <JSON>                        3D 뷰포트에 레퍼런스 이미지(Empty)로 띄우기 {path, name, key, map, flipX}
 //   refmap <JSON>                     띄운 영상의 대응 규칙이 바뀜 {key, map: {b0, t0, a, b, d, rate, fps}}
+const { tr } = require('./i18n');
 const net = require('net');
 const readline = require('readline');
 const crypto = require('crypto');
@@ -118,14 +119,14 @@ const clipDir = () => path.join(app.getPath('userData'), 'blender-clips');
 async function localFileFor(ref, onProgress) {
   if (ref.file) return ref.file;
   const src = sources.getSource(ref.sourceId);
-  if (!src) throw new Error('소스를 찾을 수 없습니다');
+  if (!src) throw new Error(tr('소스를 찾을 수 없습니다'));
   if (src.type !== 'dav') return sources.localFullPath(src, ref.path);
   const dir = path.join(clipDir(), crypto.createHash('sha1').update(`${src.id}|${ref.path}`).digest('hex').slice(0, 16));
   const out = path.join(dir, path.basename(ref.path));
   const res = await sources.davRequest(src, 'GET', ref.path);
   if (res.statusCode !== 200) {
     res.resume();
-    throw new Error(`NAS 응답 ${res.statusCode}`);
+    throw new Error(tr('NAS 응답 {0}', res.statusCode));
   }
   const total = Number(res.headers['content-length']) || 0;
   const have = await fs.promises.stat(out).catch(() => null);
@@ -157,7 +158,7 @@ async function localFileFor(ref, onProgress) {
 }
 
 async function sendClip(kind, ref, info) {
-  if (!sock) return { ok: false, error: 'Blender 와 연결되어 있지 않습니다' };
+  if (!sock) return { ok: false, error: tr('Blender 와 연결되어 있지 않습니다') };
   try {
     const file = await localFileFor(ref, (p) => send('blender:bgProgress', p));
     toBlender(`${kind} ` + JSON.stringify({ ...info, path: file }));

@@ -17,13 +17,13 @@ function initUpdateNotice() {
     const btns = [];
     let msg;
     if (kind === 'renderer') {
-      msg = '새 버전이 있습니다';
-      btns.push(['다시 불러오기', 'primary', reloadKeepingBoard]);
+      msg = tr('새 버전이 있습니다');
+      btns.push([tr('다시 불러오기'), 'primary', reloadKeepingBoard]);
     } else {
-      msg = '새 버전이 있습니다 — 다시 시작하면 적용됩니다';
-      btns.push(['다시 시작', 'primary', relaunchKeepingBoard]);
+      msg = tr('새 버전이 있습니다 — 다시 시작하면 적용됩니다');
+      btns.push([tr('다시 시작'), 'primary', relaunchKeepingBoard]);
     }
-    btns.push(['나중에', '', () => (bar.hidden = true)]);
+    btns.push([tr('나중에'), '', () => (bar.hidden = true)]);
 
     const ic = h('span', 'ic-wrap');
     ic.innerHTML = icon('refresh');
@@ -33,7 +33,7 @@ function initUpdateNotice() {
       b.onclick = fn;
       bar.append(b);
     }
-    bar.title = '바뀐 파일:\n' + files.join('\n');
+    bar.title = tr('바뀐 파일:\n') + files.join('\n');
     bar.dataset.kind = kind;
     bar.hidden = false;
   });

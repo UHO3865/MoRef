@@ -62,7 +62,7 @@ function fpsLabel(it) {
   if (it.kind === 'gif') return '';
   const f = fpsOf(it);
   const txt = Math.abs(f - Math.round(f)) < 0.01 ? String(Math.round(f)) : f.toFixed(3);
-  return it.fps ? `${txt} fps${it.vfr ? ' (가변 프레임 — 대략값)' : ''}` : it.estFps ? `${txt} fps (재생 화면으로 추정)` : '30 fps (확인 전 — 기본값)';
+  return it.fps ? `${txt} fps${it.vfr ? tr(' (가변 프레임 — 대략값)') : ''}` : it.estFps ? tr('{0} fps (재생 화면으로 추정)', txt) : tr('30 fps (확인 전 — 기본값)');
 }
 
 // 24x24 선 아이콘 (stroke = currentColor)
@@ -165,7 +165,7 @@ function renderSourceSelect() {
   const sel = $('#sourceSelect');
   sel.innerHTML = '';
   if (!app.sources.length) {
-    sel.append(new Option('소스 없음 — ⚙ 에서 추가', ''));
+    sel.append(new Option(tr('소스 없음 — ⚙ 에서 추가'), ''));
     return;
   }
   for (const s of app.sources) sel.append(new Option(s.name, s.id));
@@ -180,7 +180,7 @@ async function openFolder(rel, { refresh = false } = {}) {
     app.entries = [];
     renderGrid();
     $('#crumbs').innerHTML = '';
-    $('#listInfo').textContent = '연결된 소스가 없습니다.';
+    $('#listInfo').textContent = tr('연결된 소스가 없습니다.');
     return;
   }
   const changedFolder = app.cwd !== rel || app.listSource !== app.sourceId;
@@ -209,25 +209,25 @@ async function openFolder(rel, { refresh = false } = {}) {
     }
   }
   if (!shown) {
-    info.textContent = '불러오는 중…';
+    info.textContent = tr('불러오는 중…');
     $('#grid').innerHTML = '';
     app.cardByKey.clear();
   } else {
-    info.textContent += ' · 새로 고치는 중…';
+    info.textContent += tr(' · 새로 고치는 중…');
   }
 
   // 오래 걸리면: 절전 중이던 NAS 가 깨어나는 중일 수 있다
   const slow = setTimeout(() => {
-    if (stillHere() && !shown) info.textContent = 'NAS 응답을 기다리는 중… (절전 중이던 NAS 는 깨어나는 데 10~30초 걸릴 수 있습니다)';
+    if (stillHere() && !shown) info.textContent = tr('NAS 응답을 기다리는 중… (절전 중이던 NAS 는 깨어나는 데 10~30초 걸릴 수 있습니다)');
   }, 2500);
   const r = await rb.source.list(sourceId, rel);
   clearTimeout(slow);
   if (!stillHere()) return;
   if (r.error) {
     if (shown) {
-      info.textContent = `폴더 ${countDirs(shown)} · 파일 ${shown.length - countDirs(shown)} (저장된 목록 — 새로 고침 실패: ${r.error})`;
+      info.textContent = tr('폴더 {0} · 파일 {1} (저장된 목록 — 새로 고침 실패: {2})', countDirs(shown), shown.length - countDirs(shown), r.error);
     } else {
-      info.textContent = `불러오기 실패: ${r.error} — ⟳ 로 다시 시도`;
+      info.textContent = tr('불러오기 실패: {0} — ⟳ 로 다시 시도', r.error);
       info.classList.add('error');
     }
     return;
@@ -318,7 +318,7 @@ async function requestThumb(card, pri) {
     visibleObserver.unobserve(card);
   } else if (r.error) {
     card.thumbState = 'error';
-    th.title = r.error;
+    th.title = tr(r.error); // 썸네일 실패 기록(한국어 원문)도 번역
     th.firstChild.textContent = '⚠';
     nearObserver.unobserve(card);
     visibleObserver.unobserve(card);
@@ -376,7 +376,7 @@ function renderGrid() {
 function updateListInfo(list = app.entries) {
   const nDir = countDirs(list);
   const onBoard = list.filter((e) => e.kind !== 'dir' && app.boardCount.get(boardKey(app.sourceId, e.path))).length;
-  $('#listInfo').textContent = `폴더 ${nDir} · 파일 ${list.length - nDir}` + (onBoard ? ` · 보드에 ${onBoard}` : '');
+  $('#listInfo').textContent = tr('폴더 {0} · 파일 {1}', nDir, list.length - nDir) + (onBoard ? tr(' · 보드에 {0}', onBoard) : '');
 }
 
 // ---------- 보드에 올라간 영상 표시 ----------
@@ -388,7 +388,7 @@ function markCard(card) {
   if (!n) return tag?.remove();
   if (!tag) {
     tag = h('span', 'ob');
-    tag.title = '보드에 올라가 있음 — 우클릭: 보드에서 보기';
+    tag.title = tr('보드에 올라가 있음 — 우클릭: 보드에서 보기');
     $('.th', card).append(tag);
   }
   tag.innerHTML = icon('check') + (n > 1 ? `<b>${n}</b>` : '');
@@ -417,7 +417,7 @@ function flashCard(key) {
 
 // 보드 항목 → 패널에서 해당 파일 위치 보여 주기
 function locateInPanel(it) {
-  if (!it.ref.sourceId) return toast('탐색기에서 끌어온 파일이라 패널 위치가 없습니다');
+  if (!it.ref.sourceId) return toast(tr('탐색기에서 끌어온 파일이라 패널 위치가 없습니다'));
   if (document.body.classList.contains('panel-hidden')) togglePanel();
   const key = boardKey(it.ref.sourceId, it.ref.path);
   const dir = it.ref.path.split('/').slice(0, -1).join('/');
@@ -434,13 +434,13 @@ function locateInPanel(it) {
 function cardMenu(ev, card) {
   const e = card._entry;
   if (e.kind === 'dir') {
-    return showMenu(ev.clientX, ev.clientY, [{ label: '폴더 열기', icon: 'folder', action: () => openFolder(e.path) }]);
+    return showMenu(ev.clientX, ev.clientY, [{ label: tr('폴더 열기'), icon: 'folder', action: () => openFolder(e.path) }]);
   }
   const onBoard = [...app.items.values()].filter((it) => it.ref.sourceId === card._sourceId && it.ref.path === e.path);
   const items = [];
   if (onBoard.length) {
     items.push({
-      label: onBoard.length > 1 ? `보드에서 보기 (${onBoard.length}개 중 다음)` : '보드에서 보기',
+      label: onBoard.length > 1 ? tr('보드에서 보기 ({0}개 중 다음)', onBoard.length) : tr('보드에서 보기'),
       icon: 'target',
       primary: true,
       action: () => {
@@ -449,18 +449,18 @@ function cardMenu(ev, card) {
       },
     });
   }
-  items.push({ label: onBoard.length ? '보드에 하나 더 올리기' : '보드에 올리기', icon: 'plus', hint: '더블클릭', action: () => addFromEntry(e) });
+  items.push({ label: onBoard.length ? tr('보드에 하나 더 올리기') : tr('보드에 올리기'), icon: 'plus', hint: tr('더블클릭'), action: () => addFromEntry(e) });
   if (onBoard.length) {
-    items.push({ label: '보드에서 모두 닫기', icon: 'x', danger: true, action: () => onBoard.forEach(removeItem) });
+    items.push({ label: tr('보드에서 모두 닫기'), icon: 'x', danger: true, action: () => onBoard.forEach(removeItem) });
   }
   items.push('sep', {
-    label: '경로 복사',
+    label: tr('경로 복사'),
     icon: 'copy',
     action: () => {
       const src = app.sources.find((s) => s.id === card._sourceId);
       const full = src?.type === 'local' ? src.url.replace(/[\\/]+$/, '') + '\\' + e.path.replaceAll('/', '\\') : (src?.url || '') + e.path;
       rb.copyText(full);
-      toast('경로를 복사했습니다');
+      toast(tr('경로를 복사했습니다'));
     },
   });
   showMenu(ev.clientX, ev.clientY, items);
@@ -573,7 +573,7 @@ function initThumbSlider() {
     ticks.append(t);
     const b = h('button');
     b.innerHTML = gridIcon(cols);
-    b.title = cols === 1 ? '한 줄에 1개 (가장 크게)' : `한 줄에 ${cols}개`;
+    b.title = cols === 1 ? tr('한 줄에 1개 (가장 크게)') : tr('한 줄에 {0}개', cols);
     b.style.left = pos;
     b.onclick = () => goThumbStep(i);
     icons.append(b);
@@ -734,7 +734,7 @@ function markDirty() {
 }
 
 function updateTitle() {
-  const name = app.boardFile ? app.boardFile.split(/[\\/]/).pop() : '제목 없음';
+  const name = app.boardFile ? app.boardFile.split(/[\\/]/).pop() : tr('제목 없음');
   $('#boardName').textContent = (app.dirty ? '● ' : '') + name;
   document.title = `${name} - RefBoard`;
 }
@@ -835,7 +835,7 @@ function buildItemEl(it) {
   if (it.kind === 'image') {
     it.media = h('img');
     it.media.onload = () => fitAspect(it, it.media.naturalWidth, it.media.naturalHeight);
-    it.media.onerror = () => showError(it, '이미지를 불러올 수 없음');
+    it.media.onerror = () => showError(it, tr('이미지를 불러올 수 없음'));
   } else if (it.kind === 'gif') {
     const g = new GifPlayer();
     g.onloadedmetadata = () => fitAspect(it, g.videoWidth, g.videoHeight);
@@ -843,7 +843,7 @@ function buildItemEl(it) {
       if (it.sync && app.blender) applySync(it, app.blender);
       if (it.seekSegWhenReady) activateSegment(it, it.activeSeg, { quiet: true });
     };
-    g.onerror = () => showError(it, g.error?.message || 'GIF 를 불러올 수 없음');
+    g.onerror = () => showError(it, g.error?.message || tr('GIF 를 불러올 수 없음'));
     g.onplay = g.onpause = () => updatePlayBtn(it);
     it.media = g;
   } else {
@@ -860,7 +860,7 @@ function buildItemEl(it) {
     };
     v.onerror = () => {
       const code = v.error?.code;
-      showError(it, code === 4 ? '재생할 수 없는 형식/코덱입니다' : 'NAS에서 영상을 읽지 못했습니다 (연결 확인)');
+      showError(it, code === 4 ? tr('재생할 수 없는 형식/코덱입니다') : tr('NAS에서 영상을 읽지 못했습니다 (연결 확인)'));
     };
     v.onplay = v.onpause = () => updatePlayBtn(it);
     v.addEventListener('loadstart', () => (it.hasFrame = false));
@@ -904,7 +904,7 @@ function buildItemEl(it) {
   top.append(it.badges);
   const close = h('button', 'close');
   close.innerHTML = icon('x');
-  close.title = '닫기 (Delete)';
+  close.title = tr('닫기 (Delete)');
   close.onpointerdown = (e) => e.stopPropagation();
   close.onclick = () => removeItem(it);
   top.append(close);
@@ -913,7 +913,7 @@ function buildItemEl(it) {
   if (isTimed(it)) {
     const big = h('button', 'bigplay');
     big.innerHTML = icon('play');
-    big.title = '재생 (Space)';
+    big.title = tr('재생 (Space)');
     big.onpointerdown = (e) => e.stopPropagation();
     big.onclick = () => togglePlay(it);
     el.append(big);
@@ -1001,7 +1001,7 @@ function buildControls(it) {
   };
   // 활성 구간의 시작/끝 손잡이를 끌어서 조절
   for (const [mk, which] of [[c.mkA, 'a'], [c.mkB, 'b']]) {
-    mk.title = which === 'a' ? '구간 시작 — 끌어서 조절' : '구간 끝 — 끌어서 조절';
+    mk.title = which === 'a' ? tr('구간 시작 — 끌어서 조절') : tr('구간 끝 — 끌어서 조절');
     mk.onpointerdown = (ev) => {
       ev.stopPropagation();
       if (ev.button !== 0) return;
@@ -1044,9 +1044,9 @@ function buildControls(it) {
     return b;
   };
 
-  c.play = btn('play', '재생 / 일시정지 (Space)', () => togglePlay(it), 'play');
-  btn('prev', '한 프레임 뒤로 (←, Shift: 1초)', () => step(it, -FRAME), 'step');
-  btn('next', '한 프레임 앞으로 (→, Shift: 1초)', () => step(it, FRAME), 'step');
+  c.play = btn('play', tr('재생 / 일시정지 (Space)'), () => togglePlay(it), 'play');
+  btn('prev', tr('한 프레임 뒤로 (←, Shift: 1초)'), () => step(it, -FRAME), 'step');
+  btn('next', tr('한 프레임 앞으로 (→, Shift: 1초)'), () => step(it, FRAME), 'step');
   c.time = h('span', 'time');
   c.cur = h('b', '', '0:00.0');
   c.dur = h('span', 'dur', ' / 0:00.0');
@@ -1057,14 +1057,14 @@ function buildControls(it) {
   row.append(h('span', 'grow'));
 
   // 구간 추가: 누를 때마다 시작 → 끝 (끝을 누르면 구간이 생긴다)
-  c.segAdd = btn('segAdd', '구간 만들기 — 시작에서 한 번, 끝에서 한 번 ([ / ])', () => {
+  c.segAdd = btn('segAdd', tr('구간 만들기 — 시작에서 한 번, 끝에서 한 번 ([ / ])'), () => {
     if (segActive(it)) it.activeSeg = null; // 새 구간은 전체 재생 상태에서 만든다
     setLoopPoint(it, it.pendingA == null ? 'a' : 'b');
   }, 'segadd');
 
   // 속도: 클릭하면 목록, 휠로 한 단계씩
   c.speed = h('button', 'speed');
-  c.speed.title = '재생 속도 (클릭: 목록 · 휠: 한 단계 · - / =)';
+  c.speed.title = tr('재생 속도 (클릭: 목록 · 휠: 한 단계 · - / =)');
   c.menu = h('div', 'menu');
   for (const r of [...SPEEDS].reverse()) {
     const o = h('button', '', r + '×');
@@ -1091,8 +1091,8 @@ function buildControls(it) {
   };
   row.append(c.speed);
   c.sync = btn('link', '', () => toggleSync(it), 'sync'); // Blender 와 연결됐을 때만 보인다 (CSS)
-  if (it.kind === 'gif') c.frames = btn('frames', '모든 프레임 보기 (G) — 프레임을 누르면 그 프레임으로', () => toggleFrames(it), 'framesbtn');
-  else c.mute = btn('mute', '소리 켜기 / 끄기 (M)', () => toggleMute(it), 'mutebtn');
+  if (it.kind === 'gif') c.frames = btn('frames', tr('모든 프레임 보기 (G) — 프레임을 누르면 그 프레임으로'), () => toggleFrames(it), 'framesbtn');
+  else c.mute = btn('mute', tr('소리 켜기 / 끄기 (M)'), () => toggleMute(it), 'mutebtn');
 
   c.strip = h('div', 'segstrip');
   bar.append(scrub, row, c.strip, c.menu);
@@ -1117,7 +1117,7 @@ function showError(it, msg) {
 }
 
 function updateFpsUi(it) {
-  if (it.ctl?.fr) it.ctl.fr.title = `프레임 번호 · ${fpsLabel(it)}`;
+  if (it.ctl?.fr) it.ctl.fr.title = tr('프레임 번호 · {0}', fpsLabel(it));
 }
 
 function updatePlayBtn(it) {
@@ -1181,7 +1181,7 @@ function setSpeed(it, rate) {
   it.rate = rate;
   it.media.playbackRate = rate;
   updateSpeedBtn(it);
-  toast(`속도 ${rate}×`);
+  toast(tr('속도 {0}×', rate));
   markDirty();
 }
 // GIF: 모든 프레임 보기
@@ -1192,7 +1192,7 @@ function toggleFrames(it) {
   applyVisual(it); // 모든 프레임은 자르지 않고 전체로
   it.ctl.frames.classList.toggle('on', on);
   it.el.classList.toggle('frames', on);
-  toast(on ? '모든 프레임 — 프레임을 누르면 그 프레임으로 갑니다' : '모든 프레임 보기 끔');
+  toast(on ? tr('모든 프레임 — 프레임을 누르면 그 프레임으로 갑니다') : tr('모든 프레임 보기 끔'));
 }
 
 function toggleMute(it) {
@@ -1296,7 +1296,7 @@ function tick() {
       c.fr.dataset.seg = inSeg;
       c.fr.classList.toggle('inseg', !!si);
       c.fr.style.setProperty('--c', si?.color || '');
-      c.fr.title = si ? `${si.name} 안에서의 프레임 · 전체 ${totalFrames(it)}프레임 중 ${currentFrame(it) + 1}` : `프레임 번호 · ${fpsLabel(it) || '프레임'}`;
+      c.fr.title = si ? tr('{0} 안에서의 프레임 · 전체 {1}프레임 중 {2}', si.name, totalFrames(it), currentFrame(it) + 1) : tr('프레임 번호 · {0}', fpsLabel(it) || tr('프레임'));
     }
     let bufEnd = 0;
     for (let i = 0; i < v.buffered.length; i++) {
@@ -1420,54 +1420,54 @@ function itemMenu(ev, it) {
     // 진행 바 위에서 누르면 그 지점, 아니면 현재 재생 위치
     const scrub = ev.target.closest?.('.scrub');
     let t = v.currentTime;
-    let where = '현재 위치';
+    let where = tr('현재 위치');
     if (scrub && d) {
       const r = $('.rail', scrub).getBoundingClientRect();
       t = Math.min(1, Math.max(0, (ev.clientX - r.left) / r.width)) * d;
-      where = '이 지점';
+      where = tr('이 지점');
     }
     const fr = it.kind === 'gif' ? (v.frameCount ? v.frameAt(t) + 1 : 0) : Math.floor(t * fpsOf(it) + 0.01) + 1;
-    items.push({ header: `${where} ${fmtTime(t)} · ${fr} / ${totalFrames(it)} 프레임` + (it.kind === 'video' ? ` · ${fpsLabel(it).split(' (')[0]}` : '') });
+    items.push({ header: tr('{0} {1} · {2} / {3} 프레임', where, fmtTime(t), fr, totalFrames(it)) + (it.kind === 'video' ? ` · ${fpsLabel(it).split(' (')[0]}` : '') });
     const sg = segActive(it);
     if (sg) {
       const n = segIndex(it, sg);
-      items.push({ label: `구간 ${n} 시작을 여기로`, icon: 'markA', hint: '[', action: () => setLoopPoint(it, 'a', t) });
-      items.push({ label: `구간 ${n} 끝을 여기로`, icon: 'markB', hint: ']', action: () => setLoopPoint(it, 'b', t) });
-      items.push({ label: '전체 재생 (구간 반복 끄기)', icon: 'loop', hint: '0', action: () => clearLoop(it) });
-      items.push({ label: `${segName(it, sg)} — ${sg.name ? '이름 바꾸기…' : '이름 붙이기…'}`, icon: 'pen', hint: 'F2', action: () => startRename(it, sg.id) });
-      items.push({ label: `구간 ${n} 삭제`, icon: 'trash', danger: true, action: () => deleteSegment(it, sg.id) });
+      items.push({ label: tr('구간 {0} 시작을 여기로', n), icon: 'markA', hint: '[', action: () => setLoopPoint(it, 'a', t) });
+      items.push({ label: tr('구간 {0} 끝을 여기로', n), icon: 'markB', hint: ']', action: () => setLoopPoint(it, 'b', t) });
+      items.push({ label: tr('전체 재생 (구간 반복 끄기)'), icon: 'loop', hint: '0', action: () => clearLoop(it) });
+      items.push({ label: `${segName(it, sg)} — ${sg.name ? tr('이름 바꾸기…') : tr('이름 붙이기…')}`, icon: 'pen', hint: 'F2', action: () => startRename(it, sg.id) });
+      items.push({ label: tr('구간 {0} 삭제', n), icon: 'trash', danger: true, action: () => deleteSegment(it, sg.id) });
     } else {
-      items.push({ label: it.pendingA != null ? `새 구간 시작을 여기로 (지금 ${fmtTime(it.pendingA)})` : '여기서 새 구간 시작', icon: 'markA', hint: '[', action: () => setLoopPoint(it, 'a', t) });
-      items.push({ label: '여기서 새 구간 끝 — 구간 만들기', icon: 'markB', hint: ']', disabled: t <= (it.pendingA ?? 0) + 0.02, action: () => setLoopPoint(it, 'b', t) });
+      items.push({ label: it.pendingA != null ? tr('새 구간 시작을 여기로 (지금 {0})', fmtTime(it.pendingA)) : tr('여기서 새 구간 시작'), icon: 'markA', hint: '[', action: () => setLoopPoint(it, 'a', t) });
+      items.push({ label: tr('여기서 새 구간 끝 — 구간 만들기'), icon: 'markB', hint: ']', disabled: t <= (it.pendingA ?? 0) + 0.02, action: () => setLoopPoint(it, 'b', t) });
     }
     if (it.segments.length) {
       it.segments.forEach((g, i) => {
-        if (g !== sg && i < 9) items.push({ label: `${segName(it, g)} 반복 · ${segFrames(it, g)}프레임`, icon: 'loop', hint: String(i + 1), action: () => activateSegment(it, g.id) });
+        if (g !== sg && i < 9) items.push({ label: tr('{0} 반복 · {1}프레임', segName(it, g), segFrames(it, g)), icon: 'loop', hint: String(i + 1), action: () => activateSegment(it, g.id) });
       });
     }
     items.push('sep');
-    items.push({ label: v.paused ? '재생' : '일시정지', icon: v.paused ? 'play' : 'pause', hint: 'Space', action: () => togglePlay(it) });
-    if (it.kind === 'gif') items.push({ label: v.grid ? '모든 프레임 보기 끄기' : '모든 프레임 보기', icon: 'frames', hint: 'G', action: () => toggleFrames(it) });
-    else items.push({ label: it.muted ? '소리 켜기' : '소리 끄기', icon: it.muted ? 'vol' : 'mute', hint: 'M', action: () => toggleMute(it) });
+    items.push({ label: v.paused ? tr('재생') : tr('일시정지'), icon: v.paused ? 'play' : 'pause', hint: 'Space', action: () => togglePlay(it) });
+    if (it.kind === 'gif') items.push({ label: v.grid ? tr('모든 프레임 보기 끄기') : tr('모든 프레임 보기'), icon: 'frames', hint: 'G', action: () => toggleFrames(it) });
+    else items.push({ label: it.muted ? tr('소리 켜기') : tr('소리 끄기'), icon: it.muted ? 'vol' : 'mute', hint: 'M', action: () => toggleMute(it) });
     items.push('sep');
   }
   if (app.linked && isTimed(it)) {
-    items.push({ label: 'Blender 타임라인에 맞추기', icon: 'link', hint: 'L', checked: !!it.sync, action: () => toggleSync(it) });
-    if (it.sync) items.push({ label: '지금 프레임으로 다시 맞추기', icon: 'target', action: () => { realignSync(it); toast('기준점을 다시 맞췄습니다'); } });
+    items.push({ label: tr('Blender 타임라인에 맞추기'), icon: 'link', hint: 'L', checked: !!it.sync, action: () => toggleSync(it) });
+    if (it.sync) items.push({ label: tr('지금 프레임으로 다시 맞추기'), icon: 'target', action: () => { realignSync(it); toast(tr('기준점을 다시 맞췄습니다')); } });
     if (it.kind === 'video') {
-      items.push({ label: 'Blender 뷰포트에 띄우기', icon: 'image', action: () => sendToViewport(it) });
-      items.push({ label: 'Blender 카메라 배경으로 보내기', icon: 'image', action: () => sendToCameraBg(it) });
+      items.push({ label: tr('Blender 뷰포트에 띄우기'), icon: 'image', action: () => sendToViewport(it) });
+      items.push({ label: tr('Blender 카메라 배경으로 보내기'), icon: 'image', action: () => sendToCameraBg(it) });
     }
     items.push('sep');
   }
-  items.push({ label: '좌우 반전', icon: 'mirror', hint: 'Shift+H', checked: it.flipH, action: () => toggleFlip(it, 'flipH') });
-  items.push({ label: '상하 반전', icon: 'flipV', hint: 'Shift+V', checked: it.flipV, action: () => toggleFlip(it, 'flipV') });
-  items.push({ label: '흑백', icon: 'gray', hint: 'Shift+G', checked: it.gray, action: () => toggleGray(it) });
-  items.push({ label: '자르기…', icon: 'crop', hint: 'C', action: () => startCrop(it) });
-  if (it.crop) items.push({ label: '자르기 해제', icon: 'undo', action: () => resetCrop(it) });
+  items.push({ label: tr('좌우 반전'), icon: 'mirror', hint: 'Shift+H', checked: it.flipH, action: () => toggleFlip(it, 'flipH') });
+  items.push({ label: tr('상하 반전'), icon: 'flipV', hint: 'Shift+V', checked: it.flipV, action: () => toggleFlip(it, 'flipV') });
+  items.push({ label: tr('흑백'), icon: 'gray', hint: 'Shift+G', checked: it.gray, action: () => toggleGray(it) });
+  items.push({ label: tr('자르기…'), icon: 'crop', hint: 'C', action: () => startCrop(it) });
+  if (it.crop) items.push({ label: tr('자르기 해제'), icon: 'undo', action: () => resetCrop(it) });
   items.push('sep');
-  items.push({ label: '패널에서 위치 보기', icon: 'folder', disabled: !it.ref.sourceId, action: () => locateInPanel(it) });
-  items.push({ label: '보드에서 닫기', icon: 'x', hint: 'Delete', danger: true, action: () => removeItem(it) });
+  items.push({ label: tr('패널에서 위치 보기'), icon: 'folder', disabled: !it.ref.sourceId, action: () => locateInPanel(it) });
+  items.push({ label: tr('보드에서 닫기'), icon: 'x', hint: 'Delete', danger: true, action: () => removeItem(it) });
   showMenu(ev.clientX, ev.clientY, items);
 }
 
@@ -1747,7 +1747,7 @@ function applyShapes(action, which) {
 
 function undo() {
   const a = app.undo.pop();
-  if (!a) return toast('되돌릴 그림이 없습니다');
+  if (!a) return toast(tr('되돌릴 그림이 없습니다'));
   applyShapes(a, 'before');
   app.redo.push(a);
 }
@@ -1830,7 +1830,7 @@ function clearDrawings() {
   const action = targets.map((it) => ({ it, before: structuredClone(it.shapes), after: [] }));
   applyShapes(action, 'after');
   pushUndo(action);
-  toast('그림을 지웠습니다 (Ctrl+Z 로 되돌리기)');
+  toast(tr('그림을 지웠습니다 (Ctrl+Z 로 되돌리기)'));
 }
 
 function setDrawMode(on) {
@@ -1884,7 +1884,7 @@ function updateWidthDot() {
 function toggleDrawHidden(force) {
   const hidden = document.body.classList.toggle('draw-hidden', force);
   $('#btnHideDraw').innerHTML = icon(hidden ? 'eyeOff' : 'eye');
-  toast(hidden ? '그림 숨김 (H)' : '그림 보임');
+  toast(hidden ? tr('그림 숨김 (H)') : tr('그림 보임'));
 }
 
 function initDraw() {
@@ -1997,7 +1997,7 @@ async function saveBoard(saveAs) {
   app.dirty = false;
   updateTitle();
   rb.board.autosave(serialize(), p);
-  toast('저장됨');
+  toast(tr('저장됨'));
 }
 
 async function openBoard() {
@@ -2047,7 +2047,7 @@ function editSource(s) {
   f.url.value = s?.url || '';
   f.username.value = s?.username || '';
   f.password.value = '';
-  f.password.placeholder = s?.hasPassword ? '저장됨 — 바꾸려면 새로 입력' : '';
+  f.password.placeholder = s?.hasPassword ? tr('저장됨 — 바꾸려면 새로 입력') : '';
   f.insecureTLS.checked = !!s?.insecureTLS;
   $('#btnDelSrc').style.display = s ? '' : 'none';
   $('#testResult').textContent = '';
@@ -2060,8 +2060,8 @@ function onTypeChange() {
   const dav = f.type.value === 'dav';
   $('.dav-only', f).style.display = dav ? '' : 'none';
   $('#btnBrowse').style.display = dav ? 'none' : '';
-  $('#urlLabel').textContent = dav ? 'WebDAV 주소' : '폴더 경로';
-  f.url.placeholder = dav ? 'https://192.168.0.10:5006/refs' : '\\\\NAS\\refs  또는  Z:\\refs';
+  $('#urlLabel').textContent = dav ? tr('WebDAV 주소') : tr('폴더 경로');
+  f.url.placeholder = dav ? 'https://192.168.0.10:5006/refs' : tr('\\\\NAS\\refs  또는  Z:\\refs');
 }
 
 function formData() {
@@ -2088,16 +2088,16 @@ function initSettings() {
   $('#btnTest').onclick = async () => {
     const out = $('#testResult');
     out.className = 'test-result';
-    out.textContent = '연결 중…';
+    out.textContent = tr('연결 중…');
     const r = await rb.source.test(formData());
     out.className = 'test-result ' + (r.ok ? 'ok' : 'bad');
-    out.textContent = r.ok ? `연결 성공 — 최상위에 폴더/미디어 ${r.count}개` : `실패: ${r.error}`;
+    out.textContent = r.ok ? tr('연결 성공 — 최상위에 폴더/미디어 {0}개', r.count) : tr('실패: {0}', r.error);
   };
   f.onsubmit = async (ev) => {
     ev.preventDefault();
     if (!f.url.value.trim()) {
       $('#testResult').className = 'test-result bad';
-      $('#testResult').textContent = '주소/경로를 입력하세요';
+      $('#testResult').textContent = tr('주소/경로를 입력하세요');
       return;
     }
     const saved = await rb.source.save(formData());
@@ -2109,10 +2109,10 @@ function initSettings() {
     app.sourceId = saved.id;
     renderSourceSelect();
     openFolder('');
-    toast('소스 저장됨');
+    toast(tr('소스 저장됨'));
   };
   $('#btnDelSrc').onclick = async () => {
-    if (!editingId || !confirm('이 소스를 삭제할까요? (NAS 파일은 그대로입니다)')) return;
+    if (!editingId || !confirm(tr('이 소스를 삭제할까요? (NAS 파일은 그대로입니다)'))) return;
     await rb.source.delete(editingId);
     app.sources = app.sources.filter((s) => s.id !== editingId);
     if (app.sourceId === editingId) app.sourceId = app.sources[0]?.id || null;
@@ -2126,7 +2126,7 @@ function initSettings() {
   };
   $('#btnClearThumbs').onclick = async () => {
     await rb.thumb.clear();
-    toast('썸네일 캐시를 비웠습니다');
+    toast(tr('썸네일 캐시를 비웠습니다'));
     renderGrid();
   };
   for (const m of document.querySelectorAll('.modal')) {
@@ -2251,6 +2251,7 @@ function initKeys() {
 async function main() {
   const init = await rb.init();
   Object.assign(app, { proxyBase: init.proxyBase, sources: init.sources, settings: init.settings, debugSync: !!init.debugSync });
+  app.settings.languageNow = init.language;
   const st = app.settings;
   if (st.panelWidth) document.documentElement.style.setProperty('--panel-w', st.panelWidth + 'px');
   if (st.panelHidden) document.body.classList.add('panel-hidden');

@@ -13,7 +13,7 @@ const segColor = (s) => SEG_COLORS[(s.id - 1) % SEG_COLORS.length];
 const segActive = (it) => (it.activeSeg != null && it.segments?.find((s) => s.id === it.activeSeg)) || null;
 const segIndex = (it, s) => it.segments.indexOf(s) + 1;
 // "구간 2 · 발 디딤" (이름이 없으면 "구간 2")
-const segName = (it, s) => `구간 ${segIndex(it, s)}${s.name ? ` · ${s.name}` : ''}`;
+const segName = (it, s) => tr('구간 {0}{1}', segIndex(it, s), s.name ? ` · ${s.name}` : '');
 const libKey = (it) => (it.ref.file ? `file|${it.ref.file}` : `${it.ref.sourceId}|${it.ref.path}`);
 const mediaDur = (it) => durOf(it) || 0; // 받기 전이면 ffprobe 길이
 
@@ -69,7 +69,7 @@ function initSegments(it, opts) {
       const fresh = !it.segments.length;
       it.segments = lib.map((s) => ({ ...s }));
       if (!segActive(it)) it.activeSeg = null;
-      if (fresh && opts.openSeg == null) toast(`저장된 구간 ${lib.length}개를 불러왔습니다 — ${it.name}`, 2200);
+      if (fresh && opts.openSeg == null) toast(tr('저장된 구간 {0}개를 불러왔습니다 — {1}', lib.length, it.name), 2200);
     } else if (it.segments.length) {
       rb.clips.set(libKey(it), it.segments);
     }
@@ -122,7 +122,7 @@ function addSegment(it, a, b) {
   it.pendingA = null;
   activateSegment(it, s.id, { quiet: true });
   saveSegments(it);
-  toast(`구간 ${segIndex(it, s)} 만듦 · ${segFrames(it, s)}프레임 — 칩을 더블클릭하면 이름을 붙일 수 있습니다`, 2600);
+  toast(tr('구간 {0} 만듦 · {1}프레임 — 칩을 더블클릭하면 이름을 붙일 수 있습니다', segIndex(it, s), segFrames(it, s)), 2600);
   return s;
 }
 
@@ -134,7 +134,7 @@ function deleteSegment(it, id) {
   if (it.activeSeg === id) it.activeSeg = null;
   saveSegments(it);
   renderSegments(it);
-  toast(`${label} 삭제`);
+  toast(tr('{0} 삭제', label));
 }
 
 // 구간 반복 시작 (id 가 null 이면 전체 재생). 구간 시작으로 이동한다
@@ -149,7 +149,7 @@ function activateSegment(it, id, { quiet = false } = {}) {
   }
   renderSegments(it);
   markDirty();
-  if (!quiet) toast(s ? `${segName(it, s)} 반복 · ${segFrames(it, s)}프레임` : '전체 재생');
+  if (!quiet) toast(s ? tr('{0} 반복 · {1}프레임', segName(it, s), segFrames(it, s)) : tr('전체 재생'));
 }
 
 // [ / ] (예전 이름 그대로: 다른 코드와 단축키가 이 함수를 쓴다)
@@ -164,17 +164,17 @@ function setLoopPoint(it, which, t = it.media.currentTime) {
     else s.b = Math.min(d, Math.max(t, s.a + 0.02));
     saveSegments(it);
     renderSegments(it);
-    toast(`${segName(it, s)} ${which === 'a' ? '시작' : '끝'} = ${fmtTime(which === 'a' ? s.a : s.b)}`);
+    toast(`${segName(it, s)} ${which === 'a' ? tr('시작') : tr('끝')} = ${fmtTime(which === 'a' ? s.a : s.b)}`);
     return;
   }
   if (which === 'a') {
     it.pendingA = t;
     renderSegments(it);
-    toast(`새 구간 시작 ${fmtTime(t)} — 끝 지점에서 ] (또는 우클릭)`, 2200);
+    toast(tr('새 구간 시작 {0} — 끝 지점에서 ] (또는 우클릭)', fmtTime(t)), 2200);
     return;
   }
   const a = it.pendingA ?? 0;
-  if (t <= a + 0.005) return toast('끝은 시작보다 뒤여야 합니다');
+  if (t <= a + 0.005) return toast(tr('끝은 시작보다 뒤여야 합니다'));
   addSegment(it, a, t);
 }
 
@@ -220,8 +220,8 @@ function renderSegments(it) {
   const has = it.segments.length || it.pendingA != null;
   if (has) {
     const all = h('button', 'sc all' + (s ? '' : ' on'));
-    all.innerHTML = `<span class="lb">전체</span>`;
-    all.title = '전체 재생 (0 또는 \\)';
+    all.innerHTML = tr('<span class="lb">전체</span>');
+    all.title = tr('전체 재생 (0 또는 \\)');
     all.onclick = (e) => {
       e.stopPropagation();
       clearLoop(it);
@@ -231,9 +231,9 @@ function renderSegments(it) {
       const chip = h('button', 'sc' + (g === s ? ' on' : ''));
       chip.style.setProperty('--c', segColor(g));
       chip.dataset.id = g.id;
-      chip.innerHTML = `<i class="dot"></i><span class="lb">${i + 1}</span><span class="fc">${segFrames(it, g) || ''}f</span><span class="del" title="구간 삭제">${icon('x')}</span>`;
+      chip.innerHTML = tr('<i class="dot"></i><span class="lb">{0}</span><span class="fc">{1}f</span><span class="del" title="구간 삭제">{2}</span>', i + 1, segFrames(it, g) || '', icon('x'));
       if (g.name) chip.querySelector('.lb').after(Object.assign(h('span', 'nm'), { textContent: g.name })); // 이름은 글자 그대로 (HTML 아님)
-      chip.title = `${segName(it, g)}: ${fmtTime(g.a)} – ${fmtTime(g.b ?? d)} · ${segFrames(it, g)}프레임\n클릭: 이 구간 반복 (${i < 9 ? i + 1 : ''}) · 더블클릭: 이름 · 우클릭: 메뉴`;
+      chip.title = tr('{0}: {1} – {2} · {3}프레임\n클릭: 이 구간 반복 ({4}) · 더블클릭: 이름 · 우클릭: 메뉴', segName(it, g), fmtTime(g.a), fmtTime(g.b ?? d), segFrames(it, g), i < 9 ? i + 1 : '');
       chip.ondblclick = (e) => {
         e.stopPropagation();
         startRename(it, g.id);
@@ -254,7 +254,7 @@ function renderSegments(it) {
     if (it.pendingA != null) {
       const p = h('button', 'sc pending');
       p.innerHTML = `<span class="lb">${fmtTime(it.pendingA)} →</span>`;
-      p.title = '새 구간 시작점. 끝 지점에서 ] 를 누르면 구간이 생깁니다. 클릭: 취소';
+      p.title = tr('새 구간 시작점. 끝 지점에서 ] 를 누르면 구간이 생깁니다. 클릭: 취소');
       p.onclick = (e) => {
         e.stopPropagation();
         it.pendingA = null;
@@ -298,7 +298,7 @@ function startRename(it, id) {
   ed.style.setProperty('--c', segColor(g));
   const inp = h('input', 'sc-name');
   inp.value = g.name || '';
-  inp.placeholder = '구간 이름';
+  inp.placeholder = tr('구간 이름');
   inp.maxLength = 60;
   inp.spellcheck = false;
   ed.append(h('i', 'dot'), h('span', 'lb', String(segIndex(it, g))), inp);
@@ -315,7 +315,7 @@ function startRename(it, id) {
         if (v) g.name = v;
         else delete g.name;
         saveSegments(it);
-        toast(v ? `이름: ${segName(it, g)}` : `${segName(it, g)} — 이름을 지웠습니다`);
+        toast(v ? tr('이름: {0}', segName(it, g)) : tr('{0} — 이름을 지웠습니다', segName(it, g)));
       }
     }
     renderSegments(it);
@@ -344,7 +344,7 @@ function startRename(it, id) {
 
 // F2: 선택한 레퍼런스의 반복 중인 구간 (없으면 마지막 구간) 이름
 function renameCurrent(it) {
-  if (!isTimed(it) || !it.segments?.length) return toast('이름을 붙일 구간이 없습니다');
+  if (!isTimed(it) || !it.segments?.length) return toast(tr('이름을 붙일 구간이 없습니다'));
   const s = segActive(it) || it.segments[it.segments.length - 1];
   startRename(it, s.id);
 }
@@ -354,12 +354,12 @@ function segMenu(it, g, x, y) {
   const d = mediaDur(it);
   const s = segActive(it);
   showMenu(x, y, [
-    { header: `${segName(it, g)} · ${fmtTime(g.a)} – ${fmtTime(g.b ?? d)} · ${segFrames(it, g)}프레임` },
-    { label: g.name ? '이름 바꾸기…' : '이름 붙이기…', icon: 'pen', hint: 'F2', action: () => startRename(it, g.id) },
-    { label: g === s ? '전체 재생으로' : '이 구간 반복', icon: 'loop', action: () => activateSegment(it, g === s ? null : g.id) },
-    { label: '시작을 지금 위치로', icon: 'markA', action: () => editSeg(it, g, 'a') },
-    { label: '끝을 지금 위치로', icon: 'markB', action: () => editSeg(it, g, 'b') },
+    { header: tr('{0} · {1} – {2} · {3}프레임', segName(it, g), fmtTime(g.a), fmtTime(g.b ?? d), segFrames(it, g)) },
+    { label: g.name ? tr('이름 바꾸기…') : tr('이름 붙이기…'), icon: 'pen', hint: 'F2', action: () => startRename(it, g.id) },
+    { label: g === s ? tr('전체 재생으로') : tr('이 구간 반복'), icon: 'loop', action: () => activateSegment(it, g === s ? null : g.id) },
+    { label: tr('시작을 지금 위치로'), icon: 'markA', action: () => editSeg(it, g, 'a') },
+    { label: tr('끝을 지금 위치로'), icon: 'markB', action: () => editSeg(it, g, 'b') },
     'sep',
-    { label: '구간 삭제', icon: 'trash', danger: true, action: () => deleteSegment(it, g.id) },
+    { label: tr('구간 삭제'), icon: 'trash', danger: true, action: () => deleteSegment(it, g.id) },
   ]);
 }
