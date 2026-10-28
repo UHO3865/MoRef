@@ -132,7 +132,7 @@ function decorateCard(card) {
   if (!segs?.length) return;
   const badge = h('button', 'segbadge' + (app.panelOpen.has(card._key) ? ' open' : ''));
   badge.innerHTML = `${icon('loop')}<span>${segs.length}</span>`;
-  badge.title = tr('저장된 구간 {0}개 — 눌러서 펼치기', segs.length);
+  badge.title = tr('저장된 구간 {0}개 - 눌러서 펼치기', segs.length);
   badge.onclick = (ev) => {
     ev.stopPropagation();
     if (app.panelOpen.has(card._key)) app.panelOpen.delete(card._key);

@@ -1,6 +1,6 @@
 'use strict';
 /* global app, rb, $, h, icon, toast, fmtTime, isTimed, fpsOf, currentFrame, seekFrame, markDirty, positionCtl, showMenu */
-// 반복 구간 (여러 개) — 영상·GIF 공통
+// 반복 구간 (여러 개) - 영상·GIF 공통
 //
 //  * it.segments = [{ id, a, b }]  (b 가 null 이면 끝까지). it.activeSeg = 지금 반복 중인 구간 id (없으면 전체 재생)
 //  * it.a / it.b 는 "활성 구간"의 시작/끝을 가리킨다 (반복 재생, Blender 동기화가 이 값을 쓴다)
@@ -69,7 +69,7 @@ function initSegments(it, opts) {
       const fresh = !it.segments.length;
       it.segments = lib.map((s) => ({ ...s }));
       if (!segActive(it)) it.activeSeg = null;
-      if (fresh && opts.openSeg == null) toast(tr('저장된 구간 {0}개를 불러왔습니다 — {1}', lib.length, it.name), 2200);
+      if (fresh && opts.openSeg == null) toast(tr('저장된 구간 {0}개를 불러왔습니다 - {1}', lib.length, it.name), 2200);
     } else if (it.segments.length) {
       rb.clips.set(libKey(it), it.segments);
     }
@@ -96,7 +96,7 @@ function nextSegId(it) {
   return it.segments.reduce((m, s) => Math.max(m, s.id), 0) + 1;
 }
 
-// 구간 길이(프레임) — 영상은 실제 fps, GIF 는 실제 프레임
+// 구간 길이(프레임) - 영상은 실제 fps, GIF 는 실제 프레임
 function segFrames(it, s) {
   const d = mediaDur(it);
   if (!d) return 0;
@@ -122,7 +122,7 @@ function addSegment(it, a, b) {
   it.pendingA = null;
   activateSegment(it, s.id, { quiet: true });
   saveSegments(it);
-  toast(tr('구간 {0} 만듦 · {1}프레임 — 칩을 더블클릭하면 이름을 붙일 수 있습니다', segIndex(it, s), segFrames(it, s)), 2600);
+  toast(tr('구간 {0} 만듦 · {1}프레임 - 칩을 더블클릭하면 이름을 붙일 수 있습니다', segIndex(it, s), segFrames(it, s)), 2600);
   return s;
 }
 
@@ -170,7 +170,7 @@ function setLoopPoint(it, which, t = it.media.currentTime) {
   if (which === 'a') {
     it.pendingA = t;
     renderSegments(it);
-    toast(tr('새 구간 시작 {0} — 끝 지점에서 ] (또는 우클릭)', fmtTime(t)), 2200);
+    toast(tr('새 구간 시작 {0} - 끝 지점에서 ] (또는 우클릭)', fmtTime(t)), 2200);
     return;
   }
   const a = it.pendingA ?? 0;
@@ -315,7 +315,7 @@ function startRename(it, id) {
         if (v) g.name = v;
         else delete g.name;
         saveSegments(it);
-        toast(v ? tr('이름: {0}', segName(it, g)) : tr('{0} — 이름을 지웠습니다', segName(it, g)));
+        toast(v ? tr('이름: {0}', segName(it, g)) : tr('{0} - 이름을 지웠습니다', segName(it, g)));
       }
     }
     renderSegments(it);

@@ -26,7 +26,7 @@ const sources = require('./sources');
 
 let win = null;
 let sock = null;
-let link = null; // { file } — 연결된 Blender 의 정보
+let link = null; // { file } - 연결된 Blender 의 정보
 let timeline = null;
 let ctrl = null; // { port, token }
 

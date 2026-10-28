@@ -1,4 +1,4 @@
-"""RefBoard 연결 — 데스크톱 RefBoard(영상 레퍼런스 보드)를 Blender 와 이어 준다.
+"""RefBoard 연결 - 데스크톱 RefBoard(영상 레퍼런스 보드)를 Blender 와 이어 준다.
 
 RefBoard 는 따로 띄운 데스크톱 창 그대로 쓰고(항상 위 / 투명도로 Blender 위에 둘 수 있다), 이 애드온은 둘을 잇기만 한다.
 
@@ -45,7 +45,7 @@ class _State:
     rbuf = b""
     next_try = 0.0
     last_sent = None  # 마지막으로 보낸 타임라인 상태
-    preview_saved = None  # 구간 반복 전의 (미리보기 범위 사용, 시작, 끝) — 되돌리기용
+    preview_saved = None  # 구간 반복 전의 (미리보기 범위 사용, 시작, 끝) - 되돌리기용
     launched_at = 0.0  # 마지막으로 RefBoard 를 켠 시각 (여는 중 표시)
 
 
@@ -85,7 +85,7 @@ def _find_refboard():
     exe = os.path.join(root, "node_modules", "electron", "dist", "electron.exe" if IS_WIN else "electron")
     if root and os.path.isfile(exe):
         return [exe, root], "소스 폴더"
-    return None, "RefBoard 를 찾을 수 없습니다 — RefBoard 를 설치해서 한 번 실행하거나, 애드온 설정에서 소스 폴더를 지정하세요"
+    return None, "RefBoard 를 찾을 수 없습니다 - RefBoard 를 설치해서 한 번 실행하거나, 애드온 설정에서 소스 폴더를 지정하세요"
 
 
 def _link_file():
@@ -304,7 +304,7 @@ def _camera_bg(data):
     scene = bpy.context.scene
     cam = scene.camera if scene else None
     if cam is None or cam.type != "CAMERA":
-        _toast("씬에 활성 카메라가 없습니다 — 카메라를 추가하고 활성 카메라로 지정한 뒤 다시 보내세요")
+        _toast("씬에 활성 카메라가 없습니다 - 카메라를 추가하고 활성 카메라로 지정한 뒤 다시 보내세요")
         return
     path = data["path"]
     if not os.path.isfile(path):
