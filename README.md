@@ -1,5 +1,7 @@
 <p align="center"><img src="assets/icon.png" width="96" alt="RefBoard 로고"></p>
 
+<p align="center"><b>한국어</b> · <a href="README.en.md">English</a> · <a href="README.ja.md">日本語</a></p>
+
 # RefBoard
 
 **영상 레퍼런스 보드**입니다. NAS(WebDAV)나 로컬·SMB 폴더의 영상을 탐색해서 보드에 띄우고, 구간 반복·프레임 단위 이동·그리기로 동작을 분석합니다. **Blender 애드온**과 연결하면 Blender 타임라인에 맞춰 영상이 움직입니다.
@@ -182,21 +184,11 @@ npm run selftest
 
 로고를 바꾸려면 `assets/logo-source.png`(흰 바탕 검은 로고)를 교체하고 `python scripts/make-icons.py`를 실행합니다.
 
-### 구조
-
-- `src/main.js`: 창, IPC, 보드 파일 저장
-- `src/sources.js`: 소스 설정, WebDAV PROPFIND, 로컬 폴더 목록
-- `src/proxy.js`: 127.0.0.1 전용 스트리밍 프록시. 인증과 Range를 처리하며 `<video>`와 ffmpeg가 함께 사용
-- `src/thumbs.js`: FFmpeg 썸네일. `%APPDATA%\refboard\thumbs`에 캐시
-- `src/blender.js`: Blender 애드온과 주고받기 (연결 정보 파일, 타임라인, 구간 반복, 재생, 뷰포트·카메라 배경)
-- `src/addoninstall.js`: RefBoard 안에 든 애드온을 이 PC 의 Blender 에 설치 / 업데이트
-- `src/renderer/`: UI (탐색 패널, 무한 캔버스 보드)
-- `blender/refboard_dock/`: Blender 애드온 ("RefBoard 연결")
-- `src/selftest.js`: 자동 점검
-
 ## 후원
 
-RefBoard가 도움이 됐다면 커피 한 잔으로 응원해 주세요.
+RefBoard가 도움이 됐다면 커피 한 잔으로 응원해 주세요.<br>
+If RefBoard helps you, you can buy me a coffee.<br>
+RefBoard が役に立ったら、コーヒー 1 杯で応援してください。
 
 <a href="https://buymeacoffee.com/uho3865"><img src="https://img.shields.io/badge/Buy%20Me%20a%20Coffee-ffdd00?style=for-the-badge&logo=buy-me-a-coffee&logoColor=black" alt="Buy Me a Coffee"></a>
 
