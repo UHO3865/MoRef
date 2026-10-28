@@ -73,7 +73,7 @@ function renderSide(it) {
       if (g.name) meta.append(Object.assign(h('span', 'nm'), { textContent: g.name }));
       meta.append(h('span', 'fc', `${segFrames(it, g) || ''}f`));
       tile.append(img, meta);
-      tile.title = `${segName(it, g)} · ${fmtTime(g.a)} – ${fmtTime(g.b ?? it.media.duration)}\n클릭: 이 구간 반복 · 우클릭: 메뉴`;
+      tile.title = tr('{0} · {1} – {2}\n클릭: 이 구간 반복 · 우클릭: 메뉴', segName(it, g), fmtTime(g.a), fmtTime(g.b ?? it.media.duration));
       tile.onclick = (e) => {
         e.stopPropagation();
         activateSegment(it, g === s ? null : g.id);
@@ -132,7 +132,7 @@ function decorateCard(card) {
   if (!segs?.length) return;
   const badge = h('button', 'segbadge' + (app.panelOpen.has(card._key) ? ' open' : ''));
   badge.innerHTML = `${icon('loop')}<span>${segs.length}</span>`;
-  badge.title = `저장된 구간 ${segs.length}개 — 눌러서 펼치기`;
+  badge.title = tr('저장된 구간 {0}개 — 눌러서 펼치기', segs.length);
   badge.onclick = (ev) => {
     ev.stopPropagation();
     if (app.panelOpen.has(card._key)) app.panelOpen.delete(card._key);
@@ -153,7 +153,7 @@ function buildSegRow(card, segs) {
   const ref = { sourceId: card._sourceId, path: e.path, size: e.size, mtime: e.mtime };
   const row = h('div', 'segrow');
   const head = h('div', 'segrow-head');
-  head.append(Object.assign(h('span'), { textContent: e.name }), h('span', 'n', `구간 ${segs.length}`));
+  head.append(Object.assign(h('span'), { textContent: e.name }), h('span', 'n', tr('구간 {0}', segs.length)));
   row.append(head);
   const list = h('div', 'segrow-list');
   segs.forEach((g, i) => {
@@ -164,7 +164,7 @@ function buildSegRow(card, segs) {
     meta.append(h('b', '', String(i + 1)));
     if (g.name) meta.append(Object.assign(h('span', 'nm'), { textContent: g.name }));
     tile.append(img, meta);
-    tile.title = `구간 ${i + 1}${g.name ? ` · ${g.name}` : ''} · ${fmtTime(g.a)}${g.b != null ? ` – ${fmtTime(g.b)}` : ''}\n클릭: 보드에서 이 구간으로`;
+    tile.title = tr('구간 {0}{1} · {2}{3}\n클릭: 보드에서 이 구간으로', i + 1, g.name ? ` · ${g.name}` : '', fmtTime(g.a), g.b != null ? ` – ${fmtTime(g.b)}` : '');
     tile.onclick = (ev) => {
       ev.stopPropagation();
       openRange(card._sourceId, e, g.id);

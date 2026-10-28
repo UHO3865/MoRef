@@ -1,6 +1,7 @@
 // 소스(레퍼런스 저장소) 설정과 폴더 목록 조회.
 // type 'dav'  : WebDAV (Synology/QNAP 등) — PROPFIND 로 목록, GET+Range 로 스트리밍
 // type 'local': 로컬 폴더, 매핑된 드라이브, \\NAS\share 같은 SMB 경로
+const { tr } = require('./i18n');
 const fs = require('fs');
 const path = require('path');
 const http = require('http');
@@ -147,7 +148,7 @@ function davRequest(src, method, rel, { headers = {}, body } = {}) {
       { method, agent: agentFor(src), headers: { ...authHeader(src), ...headers } },
       resolve
     );
-    req.setTimeout(30000, () => req.destroy(new Error('NAS 응답 시간 초과')));
+    req.setTimeout(30000, () => req.destroy(new Error(tr('NAS 응답 시간 초과'))));
     req.on('error', reject);
     if (body) req.write(body);
     req.end();
@@ -195,8 +196,8 @@ async function listDav(src, rel) {
     res = await propfind();
   }
   const text = await readBody(res);
-  if (res.statusCode === 401) throw new Error('인증 실패 (아이디/비밀번호 확인)');
-  if (res.statusCode !== 207) throw new Error(`WebDAV 오류 ${res.statusCode}`);
+  if (res.statusCode === 401) throw new Error(tr('인증 실패 (아이디/비밀번호 확인)'));
+  if (res.statusCode !== 207) throw new Error(tr('WebDAV 오류 {0}', res.statusCode));
 
   const basePath = safeDecode(new URL(src.url).pathname).replace(/\/+$/, '');
   const doc = xml.parse(text);
@@ -232,7 +233,7 @@ function localFullPath(src, rel) {
   const root = path.resolve(src.url);
   const full = path.resolve(root, ...rel.split('/').filter(Boolean));
   if (full !== root && !full.startsWith(root.endsWith(path.sep) ? root : root + path.sep)) {
-    throw new Error('잘못된 경로');
+    throw new Error(tr('잘못된 경로'));
   }
   return full;
 }
@@ -264,7 +265,7 @@ async function listLocal(src, rel) {
 
 async function list(sourceId, rel = '') {
   const src = getSource(sourceId);
-  if (!src) throw new Error('소스를 찾을 수 없음');
+  if (!src) throw new Error(tr('소스를 찾을 수 없음'));
   const entries = src.type === 'dav' ? await listDav(src, rel) : await listLocal(src, rel);
   const order = { dir: 0, video: 1, gif: 2, image: 3 };
   entries.sort((a, b) => order[a.kind] - order[b.kind] || a.name.localeCompare(b.name, 'ko', { numeric: true }));

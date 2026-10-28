@@ -1351,3 +1351,7 @@ body.drawing .ibar.top .close { display: none; }
 
 /* Blender 애드온 설치 (addonsetup.js) */
 .addon-status { margin-top: 6px; color: #8a8a94; font-size: 12px; line-height: 1.5; }
+
+/* 언어 고르기 (설정 창 제목 줄) */
+.lang-pick { margin-left: auto; margin-right: 8px; display: inline-flex; align-items: center; gap: 6px; color: #9a9aa4; font-size: 13px; }
+.lang-pick select { background: var(--bg3, #2a2a2e); color: inherit; border: 1px solid #ffffff1f; border-radius: 6px; padding: 3px 6px; }

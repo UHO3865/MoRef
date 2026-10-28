@@ -9,6 +9,7 @@ const probe = require('./probe');
 const clips = require('./clips');
 const blender = require('./blender');
 const addonInstall = require('./addoninstall');
+const i18n = require('./i18n');
 
 const SELFTEST = process.argv.includes('--selftest');
 if (SELFTEST) {
@@ -46,7 +47,8 @@ function createWindow() {
     },
   });
   win.setOpacity(settings.opacity || 1);
-  win.loadFile(path.join(__dirname, 'renderer', 'index.html'));
+  i18n.setLang(i18n.resolveLang(settings));
+  loadUi();
   win.webContents.setWindowOpenHandler(({ url }) => {
     shell.openExternal(url);
     return { action: 'deny' };
@@ -56,6 +58,13 @@ function createWindow() {
   win.on('unmaximize', () => win.webContents.send('win:state', { maximized: false }));
   if (SELFTEST) win.webContents.once('did-finish-load', () => require('./selftest').run(win));
   blender.listen(win, { publish: !SELFTEST || !!process.env.RB_TEST_LINK });
+}
+
+// 화면 언어는 주소(?lang=)로 넘긴다: 화면 코드가 실행되기 전에 정해진다 (renderer/i18n.js)
+function loadUi() {
+  const query = { lang: i18n.getLang() };
+  if (process.env.RB_I18N_DUMP) query.i18nDump = '1';
+  win.loadFile(path.join(__dirname, 'renderer', 'index.html'), { query });
 }
 
 function setSetting(key, value) {
@@ -72,6 +81,7 @@ function registerIpc() {
       sources: cfg.sources.map(sources.publicSource),
       settings: cfg.settings,
       debugSync: !!process.env.RB_DEBUG_SYNC,
+      language: i18n.getLang(),
     };
   });
 
@@ -132,13 +142,20 @@ function registerIpc() {
   ipcMain.on('win:minimize', () => win.minimize());
   ipcMain.on('win:toggleMaximize', () => (win.isMaximized() ? win.unmaximize() : win.maximize()));
   ipcMain.on('win:close', () => win.close());
+  // 언어 바꾸기: 저장하고 화면을 새 언어로 다시 연다 (보드는 화면이 미리 자동 저장한다)
+  ipcMain.handle('app:setLanguage', (_e, lang) => {
+    if (!i18n.LANGS.includes(lang)) return;
+    setSetting('language', lang);
+    i18n.setLang(lang);
+    loadUi();
+  });
   ipcMain.on('app:relaunch', () => {
     app.relaunch({ args: process.argv.slice(1) });
     app.exit(0);
   });
 
   // ---- 보드 파일 ----
-  const filters = [{ name: 'RefBoard 보드', extensions: ['refboard'] }];
+  const filters = [{ name: i18n.tr('RefBoard 보드'), extensions: ['refboard'] }];
 
   ipcMain.handle('board:save', async (_e, json, filePath) => {
     if (!filePath) {

@@ -105,6 +105,13 @@
     <div class="modal-card">
       <div class="modal-head">
         <h2>NAS / 레퍼런스 소스</h2>
+        <label class="lang-pick" title="Language / 言語">🌐
+          <select id="langSelect">
+            <option value="ko">한국어</option>
+            <option value="en">English</option>
+            <option value="ja">日本語</option>
+          </select>
+        </label>
         <button class="icon-btn" data-close>✕</button>
       </div>
       <div class="settings-body">
@@ -167,7 +174,7 @@
         <tr><td>Shift+H / Shift+V</td><td>좌우 반전 / 상하 반전</td></tr>
         <tr><td>Shift+G</td><td>흑백</td></tr>
         <tr><td>C</td><td>자르기 (Enter 적용 · Esc 취소)</td></tr>
-        <tr><td>L</td><td>Blender 타임라인에 맞추기 (도킹 모드)</td></tr>
+        <tr><td>L</td><td>Blender 타임라인에 맞추기 (Blender 와 연결됐을 때)</td></tr>
         <tr><td>Delete</td><td>보드에서 닫기</td></tr>
         <tr><td>F</td><td>전체 보기 · 선택 항목 맞추기</td></tr>
         <tr><td>D</td><td>그리기 모드 (P 펜 · A 화살표 · O 원 · E 지우개)</td></tr>
@@ -180,6 +187,8 @@
     </div>
   </div>
 
+  <script src="i18n-strings.js"></script>
+  <script src="i18n.js"></script>
   <script src="gif.js"></script>
   <script src="transform.js"></script>
   <script src="sync.js"></script>

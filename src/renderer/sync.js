@@ -60,7 +60,7 @@ function initBlenderLink() {
   rb.blender.onLink(onBlenderLink);
   rb.blender.onState(onBlenderState);
   rb.blender.onToast((t) => toast(t, 3200));
-  rb.blender.onBgProgress((p) => toast(`Blender 로 보낼 영상 받는 중… ${Math.round(p * 100)}%`, 800));
+  rb.blender.onBgProgress((p) => toast(tr('Blender 로 보낼 영상 받는 중… {0}%', Math.round(p * 100)), 800));
 }
 
 // 연결됨 / 끊김. link = { file } | null
@@ -71,13 +71,13 @@ function onBlenderLink(link) {
   const info = $('#blenderInfo');
   if (!app.linked) {
     app.blender = null;
-    if (was) toast('Blender 와 연결이 끊겼습니다');
+    if (was) toast(tr('Blender 와 연결이 끊겼습니다'));
   } else {
     app.blenderRangeSent = undefined; // 다시 연결되면 구간을 다시 보낸다
-    info.title = `Blender 와 연결됨${link.file ? ' — ' + link.file : ''}`;
+    info.title = tr('Blender 와 연결됨{0}', link.file ? ' — ' + link.file : '');
     if (!was) {
-      info.textContent = 'Blender 연결됨';
-      toast(`Blender 와 연결됐습니다${link.file ? ' (' + link.file + ')' : ''} — 영상의 🔗 로 타임라인에 맞출 수 있습니다`, 2600);
+      info.textContent = tr('Blender 연결됨');
+      toast(tr('Blender 와 연결됐습니다{0} — 영상의 🔗 로 타임라인에 맞출 수 있습니다', link.file ? ' (' + link.file + ')' : ''), 2600);
     }
   }
   for (const it of app.items.values()) updateSyncUi(it);
@@ -105,13 +105,13 @@ function toggleSync(it) {
   if (!isTimed(it)) return;
   if (it.sync) {
     it.sync = null;
-    toast('Blender 동기화 끔');
+    toast(tr('Blender 동기화 끔'));
   } else {
     if (!app.blender) {
-      return toast(app.linked ? 'Blender 타임라인 정보를 기다리는 중입니다' : 'Blender 와 연결되어 있지 않습니다 — Blender 에서 RefBoard 애드온을 켜세요');
+      return toast(app.linked ? tr('Blender 타임라인 정보를 기다리는 중입니다') : tr('Blender 와 연결되어 있지 않습니다 — Blender 에서 RefBoard 애드온을 켜세요'));
     }
     it.sync = { b0: app.blender.frame, t0: it.media.currentTime };
-    toast(`Blender ${app.blender.frame} 프레임 = 레퍼런스 ${currentFrame(it) + 1} 프레임으로 맞췄습니다`, 2400);
+    toast(tr('Blender {0} 프레임 = 레퍼런스 {1} 프레임으로 맞췄습니다', app.blender.frame, currentFrame(it) + 1), 2400);
   }
   it.syncShown = null;
   updateSyncUi(it);
@@ -147,7 +147,7 @@ function blenderRangeFor(it) {
     start = s0;
     updateSyncUi(it);
     markDirty();
-    toast(`구간 시작을 Blender ${s0} 프레임에 맞췄습니다`, 2200);
+    toast(tr('구간 시작을 Blender {0} 프레임에 맞췄습니다', s0), 2200);
   }
   const n = Math.max(1, Math.round((b - a) * k));
   return [start, start + n - 1];
@@ -171,8 +171,8 @@ function updateSyncUi(it) {
   if (!b) return;
   b.classList.toggle('on', !!it.sync);
   b.title = it.sync
-    ? `Blender 타임라인에 맞춤 — 기준: Blender ${it.sync.b0} 프레임 = 레퍼런스 ${Math.floor(it.sync.t0 * fpsOf(it)) + 1} 프레임\n← → 로 이 레퍼런스를 움직이면 기준이 다시 잡힙니다. 클릭: 끄기`
-    : 'Blender 타임라인에 맞추기 (지금 Blender 프레임 = 지금 이 프레임)';
+    ? tr('Blender 타임라인에 맞춤 — 기준: Blender {0} 프레임 = 레퍼런스 {1} 프레임\n← → 로 이 레퍼런스를 움직이면 기준이 다시 잡힙니다. 클릭: 끄기', it.sync.b0, Math.floor(it.sync.t0 * fpsOf(it)) + 1)
+    : tr('Blender 타임라인에 맞추기 (지금 Blender 프레임 = 지금 이 프레임)');
 }
 
 // ---- Blender 로 보내기: 카메라 배경 / 뷰포트 레퍼런스 ----
@@ -189,11 +189,11 @@ function refMap(it) {
 
 // 3D 뷰포트에 레퍼런스 이미지(Empty)로 띄운다 (3D 커서 자리, 정면을 봄)
 async function sendToViewport(it) {
-  if (!app.blender) return toast('Blender 타임라인 정보를 기다리는 중입니다');
-  toast('Blender 로 보내는 중…', 1200);
+  if (!app.blender) return toast(tr('Blender 타임라인 정보를 기다리는 중입니다'));
+  toast(tr('Blender 로 보내는 중…'), 1200);
   const map = refMap(it);
   const r = await rb.blender.viewportRef(it.ref, { name: it.name, key: refKey(it), map, flipX: !!it.flipH });
-  if (!r.ok) return toast('보내지 못했습니다: ' + r.error, 3200);
+  if (!r.ok) return toast(tr('보내지 못했습니다: ') + r.error, 3200);
   (app.viewportRefs ??= new Map()).set(it.id, JSON.stringify(map));
 }
 
@@ -224,7 +224,7 @@ async function sendToCameraBg(it) {
     flipX: !!it.flipH,
     sync: it.sync ? { b0: it.sync.b0, frame0: Math.floor(it.sync.t0 * fps + 1e-6) } : null,
   };
-  toast('Blender 로 보내는 중…', 1200);
+  toast(tr('Blender 로 보내는 중…'), 1200);
   const r = await rb.blender.cameraBg(it.ref, info);
-  if (!r.ok) toast('보내지 못했습니다: ' + r.error, 3200);
+  if (!r.ok) toast(tr('보내지 못했습니다: ') + r.error, 3200);
 }

@@ -2,6 +2,7 @@
 // <video> 와 ffmpeg 가 같은 URL 로 NAS 영상을 읽도록, 인증 헤더와 Range 를 대신 처리한다.
 //   /<token>/s/<sourceId>/<rel path>   소스 안의 파일
 //   /<token>/f/<absolute path>         보드에 직접 끌어다 놓은 로컬 파일
+const { tr } = require('./i18n');
 const http = require('http');
 const fs = require('fs');
 const path = require('path');
@@ -130,7 +131,7 @@ async function serveDav(req, res, src, rel) {
       pos += body.length;
       if (pos > end || closed) break;
       const next = await fetchChunk(src, rel, pos, end);
-      if (next.status !== 206 || !next.body.length) throw new Error(`NAS 응답 ${next.status}`);
+      if (next.status !== 206 || !next.body.length) throw new Error(tr('NAS 응답 {0}', next.status));
       body = next.body.subarray(0, end - pos + 1);
     }
     res.end();

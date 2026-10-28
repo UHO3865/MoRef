@@ -25,6 +25,7 @@ contextBridge.exposeInMainWorld('rb', {
   debug: (msg) => ipcRenderer.send('debug:log', String(msg)),
   pathForFile: (file) => webUtils.getPathForFile(file),
   setSetting: invoke('settings:set'),
+  setLanguage: invoke('app:setLanguage'),
   win: {
     minimize: () => ipcRenderer.send('win:minimize'),
     toggleMaximize: () => ipcRenderer.send('win:toggleMaximize'),
