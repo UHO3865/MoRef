@@ -1,6 +1,6 @@
 'use strict';
 /* global app, $, h, icon, toast, isTimed, fpsOf, currentFrame, seekFrame, markDirty, updateViewBadges */
-// Blender 타임라인 동기화 (Blender 애드온과 연결됐을 때 — src/blender.js)
+// Blender 타임라인 동기화 (Blender 애드온과 연결됐을 때 - src/blender.js)
 //
 // 애드온이 보내는 상태 { frame, fps, playing } 에 맞춰, "Blender 타임라인에 맞추기"를 켠 레퍼런스를 움직인다.
 //  * 켜는 순간의 (Blender 프레임 b0 ↔ 레퍼런스 시각 t0) 를 기준점으로 삼는다 = 오프셋.
@@ -74,10 +74,10 @@ function onBlenderLink(link) {
     if (was) toast(tr('Blender 와 연결이 끊겼습니다'));
   } else {
     app.blenderRangeSent = undefined; // 다시 연결되면 구간을 다시 보낸다
-    info.title = tr('Blender 와 연결됨{0}', link.file ? ' — ' + link.file : '');
+    info.title = tr('Blender 와 연결됨{0}', link.file ? ' - ' + link.file : '');
     if (!was) {
       info.textContent = tr('Blender 연결됨');
-      toast(tr('Blender 와 연결됐습니다{0} — 영상의 🔗 로 타임라인에 맞출 수 있습니다', link.file ? ' (' + link.file + ')' : ''), 2600);
+      toast(tr('Blender 와 연결됐습니다{0} - 영상의 🔗 로 타임라인에 맞출 수 있습니다', link.file ? ' (' + link.file + ')' : ''), 2600);
     }
   }
   for (const it of app.items.values()) updateSyncUi(it);
@@ -108,7 +108,7 @@ function toggleSync(it) {
     toast(tr('Blender 동기화 끔'));
   } else {
     if (!app.blender) {
-      return toast(app.linked ? tr('Blender 타임라인 정보를 기다리는 중입니다') : tr('Blender 와 연결되어 있지 않습니다 — Blender 에서 RefBoard 애드온을 켜세요'));
+      return toast(app.linked ? tr('Blender 타임라인 정보를 기다리는 중입니다') : tr('Blender 와 연결되어 있지 않습니다 - Blender 에서 RefBoard 애드온을 켜세요'));
     }
     it.sync = { b0: app.blender.frame, t0: it.media.currentTime };
     toast(tr('Blender {0} 프레임 = 레퍼런스 {1} 프레임으로 맞췄습니다', app.blender.frame, currentFrame(it) + 1), 2400);
@@ -171,7 +171,7 @@ function updateSyncUi(it) {
   if (!b) return;
   b.classList.toggle('on', !!it.sync);
   b.title = it.sync
-    ? tr('Blender 타임라인에 맞춤 — 기준: Blender {0} 프레임 = 레퍼런스 {1} 프레임\n← → 로 이 레퍼런스를 움직이면 기준이 다시 잡힙니다. 클릭: 끄기', it.sync.b0, Math.floor(it.sync.t0 * fpsOf(it)) + 1)
+    ? tr('Blender 타임라인에 맞춤 - 기준: Blender {0} 프레임 = 레퍼런스 {1} 프레임\n← → 로 이 레퍼런스를 움직이면 기준이 다시 잡힙니다. 클릭: 끄기', it.sync.b0, Math.floor(it.sync.t0 * fpsOf(it)) + 1)
     : tr('Blender 타임라인에 맞추기 (지금 Blender 프레임 = 지금 이 프레임)');
 }
 

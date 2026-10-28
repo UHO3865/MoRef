@@ -20,7 +20,7 @@ function initUpdateNotice() {
       msg = tr('새 버전이 있습니다');
       btns.push([tr('다시 불러오기'), 'primary', reloadKeepingBoard]);
     } else {
-      msg = tr('새 버전이 있습니다 — 다시 시작하면 적용됩니다');
+      msg = tr('새 버전이 있습니다 - 다시 시작하면 적용됩니다');
       btns.push([tr('다시 시작'), 'primary', relaunchKeepingBoard]);
     }
     btns.push([tr('나중에'), '', () => (bar.hidden = true)]);

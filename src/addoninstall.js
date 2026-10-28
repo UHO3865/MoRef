@@ -136,7 +136,7 @@ function install(versions = blenderVersions(), { enable = true } = {}) {
   return results;
 }
 
-// RefBoard 를 켤 때: 설치돼 있지만 오래된 애드온은 조용히 바꾼다 (켜기 상태는 그대로 — 같은 모듈 이름)
+// RefBoard 를 켤 때: 설치돼 있지만 오래된 애드온은 조용히 바꾼다 (켜기 상태는 그대로 - 같은 모듈 이름)
 function updateOutdated() {
   const st = status();
   const old = st.blenders.filter((b) => b.outdated).map((b) => b.version);

@@ -62,7 +62,7 @@ function fpsLabel(it) {
   if (it.kind === 'gif') return '';
   const f = fpsOf(it);
   const txt = Math.abs(f - Math.round(f)) < 0.01 ? String(Math.round(f)) : f.toFixed(3);
-  return it.fps ? `${txt} fps${it.vfr ? tr(' (가변 프레임 — 대략값)') : ''}` : it.estFps ? tr('{0} fps (재생 화면으로 추정)', txt) : tr('30 fps (확인 전 — 기본값)');
+  return it.fps ? `${txt} fps${it.vfr ? tr(' (가변 프레임 - 대략값)') : ''}` : it.estFps ? tr('{0} fps (재생 화면으로 추정)', txt) : tr('30 fps (확인 전 - 기본값)');
 }
 
 // 24x24 선 아이콘 (stroke = currentColor)
@@ -165,7 +165,7 @@ function renderSourceSelect() {
   const sel = $('#sourceSelect');
   sel.innerHTML = '';
   if (!app.sources.length) {
-    sel.append(new Option(tr('소스 없음 — ⚙ 에서 추가'), ''));
+    sel.append(new Option(tr('소스 없음 - ⚙ 에서 추가'), ''));
     return;
   }
   for (const s of app.sources) sel.append(new Option(s.name, s.id));
@@ -225,9 +225,9 @@ async function openFolder(rel, { refresh = false } = {}) {
   if (!stillHere()) return;
   if (r.error) {
     if (shown) {
-      info.textContent = tr('폴더 {0} · 파일 {1} (저장된 목록 — 새로 고침 실패: {2})', countDirs(shown), shown.length - countDirs(shown), r.error);
+      info.textContent = tr('폴더 {0} · 파일 {1} (저장된 목록 - 새로 고침 실패: {2})', countDirs(shown), shown.length - countDirs(shown), r.error);
     } else {
-      info.textContent = tr('불러오기 실패: {0} — ⟳ 로 다시 시도', r.error);
+      info.textContent = tr('불러오기 실패: {0} - ⟳ 로 다시 시도', r.error);
       info.classList.add('error');
     }
     return;
@@ -388,7 +388,7 @@ function markCard(card) {
   if (!n) return tag?.remove();
   if (!tag) {
     tag = h('span', 'ob');
-    tag.title = tr('보드에 올라가 있음 — 우클릭: 보드에서 보기');
+    tag.title = tr('보드에 올라가 있음 - 우클릭: 보드에서 보기');
     $('.th', card).append(tag);
   }
   tag.innerHTML = icon('check') + (n > 1 ? `<b>${n}</b>` : '');
@@ -850,7 +850,7 @@ function buildItemEl(it) {
     const v = h('video');
     v.loop = true;
     v.muted = it.muted;
-    v.preload = 'none'; // 멈춘 영상은 받지 않는다 (재생·이동할 때 받기 시작 — media.js)
+    v.preload = 'none'; // 멈춘 영상은 받지 않는다 (재생·이동할 때 받기 시작 - media.js)
     v.crossOrigin = 'anonymous'; // 화면 밖으로 나갈 때 정지 화면을 저장하려면
     v.playsInline = true;
     v.onloadedmetadata = () => {
@@ -983,7 +983,7 @@ function buildControls(it) {
   scrub.onpointermove = hover;
   scrub.onpointerdown = (ev) => {
     ev.stopPropagation();
-    if (ev.button !== 0 || !dur()) return; // 우클릭은 메뉴용 — 이동하지 않음
+    if (ev.button !== 0 || !dur()) return; // 우클릭은 메뉴용 - 이동하지 않음
     scrub.setPointerCapture(ev.pointerId);
     scrub.classList.add('dragging');
     ensureLoaded(it);
@@ -1001,7 +1001,7 @@ function buildControls(it) {
   };
   // 활성 구간의 시작/끝 손잡이를 끌어서 조절
   for (const [mk, which] of [[c.mkA, 'a'], [c.mkB, 'b']]) {
-    mk.title = which === 'a' ? tr('구간 시작 — 끌어서 조절') : tr('구간 끝 — 끌어서 조절');
+    mk.title = which === 'a' ? tr('구간 시작 - 끌어서 조절') : tr('구간 끝 - 끌어서 조절');
     mk.onpointerdown = (ev) => {
       ev.stopPropagation();
       if (ev.button !== 0) return;
@@ -1057,7 +1057,7 @@ function buildControls(it) {
   row.append(h('span', 'grow'));
 
   // 구간 추가: 누를 때마다 시작 → 끝 (끝을 누르면 구간이 생긴다)
-  c.segAdd = btn('segAdd', tr('구간 만들기 — 시작에서 한 번, 끝에서 한 번 ([ / ])'), () => {
+  c.segAdd = btn('segAdd', tr('구간 만들기 - 시작에서 한 번, 끝에서 한 번 ([ / ])'), () => {
     if (segActive(it)) it.activeSeg = null; // 새 구간은 전체 재생 상태에서 만든다
     setLoopPoint(it, it.pendingA == null ? 'a' : 'b');
   }, 'segadd');
@@ -1091,7 +1091,7 @@ function buildControls(it) {
   };
   row.append(c.speed);
   c.sync = btn('link', '', () => toggleSync(it), 'sync'); // Blender 와 연결됐을 때만 보인다 (CSS)
-  if (it.kind === 'gif') c.frames = btn('frames', tr('모든 프레임 보기 (G) — 프레임을 누르면 그 프레임으로'), () => toggleFrames(it), 'framesbtn');
+  if (it.kind === 'gif') c.frames = btn('frames', tr('모든 프레임 보기 (G) - 프레임을 누르면 그 프레임으로'), () => toggleFrames(it), 'framesbtn');
   else c.mute = btn('mute', tr('소리 켜기 / 끄기 (M)'), () => toggleMute(it), 'mutebtn');
 
   c.strip = h('div', 'segstrip');
@@ -1192,7 +1192,7 @@ function toggleFrames(it) {
   applyVisual(it); // 모든 프레임은 자르지 않고 전체로
   it.ctl.frames.classList.toggle('on', on);
   it.el.classList.toggle('frames', on);
-  toast(on ? tr('모든 프레임 — 프레임을 누르면 그 프레임으로 갑니다') : tr('모든 프레임 보기 끔'));
+  toast(on ? tr('모든 프레임 - 프레임을 누르면 그 프레임으로 갑니다') : tr('모든 프레임 보기 끔'));
 }
 
 function toggleMute(it) {
@@ -1434,11 +1434,11 @@ function itemMenu(ev, it) {
       items.push({ label: tr('구간 {0} 시작을 여기로', n), icon: 'markA', hint: '[', action: () => setLoopPoint(it, 'a', t) });
       items.push({ label: tr('구간 {0} 끝을 여기로', n), icon: 'markB', hint: ']', action: () => setLoopPoint(it, 'b', t) });
       items.push({ label: tr('전체 재생 (구간 반복 끄기)'), icon: 'loop', hint: '0', action: () => clearLoop(it) });
-      items.push({ label: `${segName(it, sg)} — ${sg.name ? tr('이름 바꾸기…') : tr('이름 붙이기…')}`, icon: 'pen', hint: 'F2', action: () => startRename(it, sg.id) });
+      items.push({ label: `${segName(it, sg)} - ${sg.name ? tr('이름 바꾸기…') : tr('이름 붙이기…')}`, icon: 'pen', hint: 'F2', action: () => startRename(it, sg.id) });
       items.push({ label: tr('구간 {0} 삭제', n), icon: 'trash', danger: true, action: () => deleteSegment(it, sg.id) });
     } else {
       items.push({ label: it.pendingA != null ? tr('새 구간 시작을 여기로 (지금 {0})', fmtTime(it.pendingA)) : tr('여기서 새 구간 시작'), icon: 'markA', hint: '[', action: () => setLoopPoint(it, 'a', t) });
-      items.push({ label: tr('여기서 새 구간 끝 — 구간 만들기'), icon: 'markB', hint: ']', disabled: t <= (it.pendingA ?? 0) + 0.02, action: () => setLoopPoint(it, 'b', t) });
+      items.push({ label: tr('여기서 새 구간 끝 - 구간 만들기'), icon: 'markB', hint: ']', disabled: t <= (it.pendingA ?? 0) + 0.02, action: () => setLoopPoint(it, 'b', t) });
     }
     if (it.segments.length) {
       it.segments.forEach((g, i) => {
@@ -1735,7 +1735,7 @@ function pushUndo(action) {
   markDirty();
 }
 
-// action: { it, before: shapes[], after: shapes[] } — 항목 하나의 그림 상태 전/후
+// action: { it, before: shapes[], after: shapes[] } - 항목 하나의 그림 상태 전/후
 function applyShapes(action, which) {
   for (const { it, before, after } of action) {
     if (!app.items.has(it.id)) continue; // 이미 닫힌 영상
@@ -2047,7 +2047,7 @@ function editSource(s) {
   f.url.value = s?.url || '';
   f.username.value = s?.username || '';
   f.password.value = '';
-  f.password.placeholder = s?.hasPassword ? tr('저장됨 — 바꾸려면 새로 입력') : '';
+  f.password.placeholder = s?.hasPassword ? tr('저장됨 - 바꾸려면 새로 입력') : '';
   f.insecureTLS.checked = !!s?.insecureTLS;
   $('#btnDelSrc').style.display = s ? '' : 'none';
   $('#testResult').textContent = '';
@@ -2091,7 +2091,7 @@ function initSettings() {
     out.textContent = tr('연결 중…');
     const r = await rb.source.test(formData());
     out.className = 'test-result ' + (r.ok ? 'ok' : 'bad');
-    out.textContent = r.ok ? tr('연결 성공 — 최상위에 폴더/미디어 {0}개', r.count) : tr('실패: {0}', r.error);
+    out.textContent = r.ok ? tr('연결 성공 - 최상위에 폴더/미디어 {0}개', r.count) : tr('실패: {0}', r.error);
   };
   f.onsubmit = async (ev) => {
     ev.preventDefault();

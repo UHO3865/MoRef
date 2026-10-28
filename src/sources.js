@@ -1,5 +1,5 @@
 // 소스(레퍼런스 저장소) 설정과 폴더 목록 조회.
-// type 'dav'  : WebDAV (Synology/QNAP 등) — PROPFIND 로 목록, GET+Range 로 스트리밍
+// type 'dav'  : WebDAV (Synology/QNAP 등) - PROPFIND 로 목록, GET+Range 로 스트리밍
 // type 'local': 로컬 폴더, 매핑된 드라이브, \\NAS\share 같은 SMB 경로
 const { tr } = require('./i18n');
 const fs = require('fs');

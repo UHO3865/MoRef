@@ -33,7 +33,7 @@ function initAddonSetup() {
     bar.hidden = false;
   });
 
-  rb.addon.onUpdated((versions) => toast(tr('Blender {0} 의 RefBoard 애드온을 새 버전으로 바꿨습니다 — Blender 를 다시 켜면 적용됩니다', versions.join(', ')), 4000));
+  rb.addon.onUpdated((versions) => toast(tr('Blender {0} 의 RefBoard 애드온을 새 버전으로 바꿨습니다 - Blender 를 다시 켜면 적용됩니다', versions.join(', ')), 4000));
 
   $('#btnAddon').onclick = () => installBlenderAddon();
   initLanguagePicker();
@@ -56,7 +56,7 @@ async function installBlenderAddon() {
   if (!results.length) toast(tr('이 PC 에서 Blender 4.2 이상을 찾지 못했습니다'), 3500);
   else if (ok.length)
     toast(
-      tr('Blender {0} 에 애드온을 설치했습니다 — {1} 자동으로 켜집니다', ok.join(', '), running ? tr('Blender 를 껐다가 다시 켜면') : tr('다음에 Blender 를 켜면')),
+      tr('Blender {0} 에 애드온을 설치했습니다 - {1} 자동으로 켜집니다', ok.join(', '), running ? tr('Blender 를 껐다가 다시 켜면') : tr('다음에 Blender 를 켜면')),
       5000
     );
   if (bad.length) toast(tr('설치하지 못했습니다: {0}', bad.map((r) => `${r.version} (${r.error})`).join(', ')), 5000);

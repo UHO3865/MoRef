@@ -2,7 +2,7 @@
   "name": "refboard",
   "productName": "RefBoard",
   "version": "0.3.0",
-  "description": "PureRef 스타일 영상 레퍼런스 보드 — NAS(WebDAV)·로컬 폴더의 영상을 보드에 띄우고 Blender와 연결",
+  "description": "PureRef 스타일 영상 레퍼런스 보드 - NAS(WebDAV)·로컬 폴더의 영상을 보드에 띄우고 Blender와 연결",
   "main": "src/main.js",
   "private": true,
   "scripts": {

@@ -1,6 +1,6 @@
 'use strict';
 /* global app, $, h, icon, toast, select, layoutItem, markDirty, renderShapes, round4, toggleFrames, setDrawMode */
-// 좌우/상하 반전 · 흑백 · 자르기 — 영상/GIF/이미지 공통, 보드 파일에 저장된다.
+// 좌우/상하 반전 · 흑백 · 자르기 - 영상/GIF/이미지 공통, 보드 파일에 저장된다.
 //
 // 좌표계
 //  * 원본 좌표 (sx, sy): 원본 영상/이미지 전체에 대한 0~1 비율. it.crop = { x, y, w, h } 도 이 좌표.

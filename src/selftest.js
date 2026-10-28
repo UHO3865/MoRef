@@ -1,4 +1,4 @@
-// `npm run selftest` — 실제 창을 띄워 탐색 → 보드에 열기 → 구간반복/속도 → 저장 → 닫기 → 다시 불러오기를
+// `npm run selftest` - 실제 창을 띄워 탐색 → 보드에 열기 → 구간반복/속도 → 저장 → 닫기 → 다시 불러오기를
 // 자동으로 수행하고 단계별 스크린샷을 남긴다. 소스는 환경변수로 받는다:
 //   RB_TEST_URL, RB_TEST_TYPE(dav|local), RB_TEST_USER, RB_TEST_PASS, RB_TEST_OUT(스크린샷 폴더)
 const fs = require('fs');
