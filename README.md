@@ -2,7 +2,7 @@
 
 # RefBoard
 
-PureRef처럼 쓰는 **영상 레퍼런스 보드**입니다. NAS(WebDAV)나 로컬·SMB 폴더의 영상을 탐색해서 보드에 띄우고, 구간 반복·프레임 단위 이동·그리기로 동작을 분석합니다. **Blender 애드온**과 연결하면 Blender 타임라인에 맞춰 영상이 움직입니다.
+**영상 레퍼런스 보드**입니다. NAS(WebDAV)나 로컬·SMB 폴더의 영상을 탐색해서 보드에 띄우고, 구간 반복·프레임 단위 이동·그리기로 동작을 분석합니다. **Blender 애드온**과 연결하면 Blender 타임라인에 맞춰 영상이 움직입니다.
 
 ![RefBoard 보드](docs/screenshots/board.png)
 
