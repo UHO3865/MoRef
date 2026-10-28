@@ -1,0 +1,193 @@
+<!doctype html>
+<html lang="ko">
+<head>
+  <meta charset="utf-8" />
+  <meta http-equiv="Content-Security-Policy"
+    content="default-src 'self'; script-src 'self'; style-src 'self' 'unsafe-inline'; img-src 'self' data: blob: file: http://127.0.0.1:* http://*.localhost:*; media-src http://127.0.0.1:* http://*.localhost:*; connect-src 'self' http://127.0.0.1:*" />
+  <title>RefBoard</title>
+  <link rel="stylesheet" href="style.css" />
+</head>
+<body>
+  <header id="titlebar">
+    <div class="tb-left">
+      <button id="btnPanel" class="tb-btn" title="레퍼런스 탐색 패널 (Tab)">☰</button>
+      <img class="app-logo" src="logo.png" alt="" draggable="false" />
+      <span class="app-name">RefBoard</span>
+      <span id="boardName" class="board-name"></span>
+      <span id="blenderInfo" class="blender-info" title="Blender 와 연결됨 (타임라인)"></span>
+    </div>
+    <div class="tb-mid">
+      <button id="btnNew" class="tb-btn" title="새 보드 (Ctrl+N)">새 보드</button>
+      <button id="btnOpen" class="tb-btn" title="보드 열기 (Ctrl+O)">열기</button>
+      <button id="btnSave" class="tb-btn" title="저장 (Ctrl+S) · 다른 이름으로 (Ctrl+Shift+S)">저장</button>
+      <span class="sep"></span>
+      <button id="btnPin" class="tb-btn toggle" title="항상 위 (Ctrl+T)">📌 항상 위</button>
+      <label class="opacity" title="창 투명도">
+        <span>투명도</span>
+        <input id="opacity" type="range" min="15" max="100" value="100" />
+      </label>
+      <button id="btnDraw" class="tb-btn toggle" title="그리기 모드 (D)"><span data-icon="pen"></span>그리기</button>
+      <button id="btnFit" class="tb-btn" title="전체 보기 (F)">⤢</button>
+      <button id="btnHelp" class="tb-btn" title="단축키 (F1)">?</button>
+      <button id="btnSettings" class="tb-btn" title="NAS 연결 설정">⚙</button>
+    </div>
+    <div class="tb-right">
+      <button id="btnMin" class="win-btn" title="최소화">&#xE921;</button>
+      <button id="btnMax" class="win-btn" title="최대화">&#xE922;</button>
+      <button id="btnClose" class="win-btn close" title="닫기">&#xE8BB;</button>
+    </div>
+  </header>
+
+  <main id="main">
+    <aside id="panel">
+      <div class="panel-head">
+        <select id="sourceSelect" title="소스"></select>
+        <button id="btnRefresh" class="icon-btn" title="새로고침">⟳</button>
+      </div>
+      <div class="panel-nav">
+        <button id="btnUp" class="icon-btn" title="상위 폴더 (Backspace)">↑</button>
+        <div id="crumbs" class="crumbs"></div>
+      </div>
+      <input id="filter" class="filter" type="search" placeholder="현재 폴더에서 검색…" />
+      <div id="listInfo" class="list-info"></div>
+      <div id="grid" class="grid"></div>
+      <div class="size-ctl" title="썸네일 크기 — 끌면 정해진 크기에 자석처럼 붙습니다">
+        <div id="thumbSize" class="snap" tabindex="0" role="slider" aria-label="썸네일 크기">
+          <div class="snap-track"><div class="snap-fill"></div><div id="snapTicks" class="snap-ticks"></div></div>
+          <div class="snap-knob"></div>
+        </div>
+        <div id="gridIcons" class="grid-icons"></div>
+      </div>
+      <div id="panelResizer"></div>
+    </aside>
+
+    <section id="board" tabindex="0">
+      <div id="items"></div>
+      <div id="ctlLayer"></div>
+      <div id="drawBar" class="draw-bar">
+        <span id="drawGrip" class="grip" data-icon="grip" title="끌어서 옮기기"></span>
+        <div class="dgroup tools">
+          <button data-tool="pen" data-icon="pen" title="펜 (P)"></button>
+          <button data-tool="arrow" data-icon="arrow" title="화살표 (A)"></button>
+          <button data-tool="circle" data-icon="circle" title="원 (O)"></button>
+          <button data-tool="eraser" data-icon="eraser" title="지우개 (E) — 선을 문지르면 지워집니다"></button>
+        </div>
+        <span class="dsep"></span>
+        <div id="swatches" class="swatches"></div>
+        <label class="cpick" title="색 직접 고르기">
+          <input id="drawColor" type="color" value="#ff3b30" />
+        </label>
+        <span class="dsep"></span>
+        <label class="width" title="굵기 (Alt+휠)">
+          <span class="wdot"><i id="widthDot"></i></span>
+          <input id="drawWidth" type="range" min="1" max="24" value="4" />
+          <span id="drawWidthLabel" class="wnum">4</span>
+        </label>
+        <span class="dsep"></span>
+        <div class="dgroup">
+          <button id="btnUndo" data-icon="undo" title="되돌리기 (Ctrl+Z)"></button>
+          <button id="btnRedo" data-icon="redo" title="다시 하기 (Ctrl+Y)"></button>
+          <button id="btnHideDraw" data-icon="eye" title="그림 숨기기 / 보이기 (H)"></button>
+          <button id="btnClearDraw" class="danger" data-icon="trash" title="선택한 영상의 그림 모두 지우기 (선택 없으면 전체)"></button>
+        </div>
+        <button id="btnDrawDone" class="done" title="그리기 끝 (Esc / D)"><span data-icon="check"></span>완료</button>
+      </div>
+      <div id="emptyHint" class="empty-hint">
+        <div class="big">보드가 비어 있습니다</div>
+        <div>왼쪽 패널에서 영상을 <b>끌어다 놓거나 더블클릭</b>하세요.<br />탐색기에서 파일을 바로 끌어와도 됩니다.</div>
+      </div>
+      <div id="zoomLabel" class="zoom-label"></div>
+      <div id="toast" class="toast"></div>
+    </section>
+  </main>
+
+  <div id="settings" class="modal hidden">
+    <div class="modal-card">
+      <div class="modal-head">
+        <h2>NAS / 레퍼런스 소스</h2>
+        <button class="icon-btn" data-close>✕</button>
+      </div>
+      <div class="settings-body">
+        <div class="src-list">
+          <div id="srcList"></div>
+          <button id="btnAddSrc" class="btn">+ 소스 추가</button>
+        </div>
+        <form id="srcForm" class="src-form" autocomplete="off">
+          <input type="hidden" name="id" />
+          <label>이름<input name="name" placeholder="예: 집 NAS" /></label>
+          <label>종류
+            <select name="type">
+              <option value="dav">WebDAV (http/https)</option>
+              <option value="local">로컬 · SMB 폴더 (\\NAS\공유, Z:\)</option>
+            </select>
+          </label>
+          <label><span id="urlLabel">WebDAV 주소</span>
+            <div class="row">
+              <input name="url" placeholder="https://192.168.0.10:5006/refs" />
+              <button type="button" id="btnBrowse" class="btn">찾기…</button>
+            </div>
+          </label>
+          <div class="dav-only">
+            <label>아이디<input name="username" /></label>
+            <label>비밀번호<input name="password" type="password" /></label>
+            <label class="check"><input name="insecureTLS" type="checkbox" /> 자체 서명 인증서 허용 (Synology 기본 인증서 등)</label>
+          </div>
+          <div class="form-actions">
+            <button type="button" id="btnTest" class="btn">연결 테스트</button>
+            <button type="submit" class="btn primary">저장</button>
+            <button type="button" id="btnDelSrc" class="btn danger">삭제</button>
+          </div>
+          <div id="testResult" class="test-result"></div>
+          <hr />
+          <label>FFmpeg 경로<input id="ffmpegPath" placeholder="ffmpeg" /></label>
+          <button type="button" id="btnClearThumbs" class="btn">썸네일 캐시 비우기</button>
+          <hr />
+          <button type="button" id="btnAddon" class="btn" title="RefBoard 안에 들어 있는 애드온을 이 PC 의 Blender(4.2 이상)에 복사합니다. 다음에 Blender 를 켤 때 자동으로 켜집니다">Blender 애드온 설치 / 업데이트</button>
+          <div id="addonStatus" class="addon-status"></div>
+        </form>
+      </div>
+    </div>
+  </div>
+
+  <div id="help" class="modal hidden">
+    <div class="modal-card help-card">
+      <div class="modal-head"><h2>단축키</h2><button class="icon-btn" data-close>✕</button></div>
+      <table>
+        <tr><td>휠</td><td>확대 / 축소</td></tr>
+        <tr><td>빈 곳 드래그 · 가운데 버튼 드래그</td><td>보드 이동</td></tr>
+        <tr><td>영상 드래그 / 모서리 드래그</td><td>이동 / 크기 조절 (Shift+클릭: 다중 선택)</td></tr>
+        <tr><td>Space</td><td>선택 영상 재생 / 일시정지</td></tr>
+        <tr><td>← →</td><td>한 프레임 이동 (Shift: 1초)</td></tr>
+        <tr><td>[ &nbsp; ]</td><td>새 구간 시작 / 끝 (구간 반복 중이면 그 구간의 시작 / 끝 조절)</td></tr>
+        <tr><td>1 ~ 9 · 0</td><td>그 번호 구간 반복 · 전체 재생 (\ 도 전체)</td></tr>
+        <tr><td>F2</td><td>구간 이름 (칩 더블클릭으로도)</td></tr>
+        <tr><td>- &nbsp; =</td><td>재생 속도 낮추기 / 올리기</td></tr>
+        <tr><td>M</td><td>음소거 전환</td></tr>
+        <tr><td>G</td><td>GIF 모든 프레임 보기</td></tr>
+        <tr><td>Shift+H / Shift+V</td><td>좌우 반전 / 상하 반전</td></tr>
+        <tr><td>Shift+G</td><td>흑백</td></tr>
+        <tr><td>C</td><td>자르기 (Enter 적용 · Esc 취소)</td></tr>
+        <tr><td>L</td><td>Blender 타임라인에 맞추기 (도킹 모드)</td></tr>
+        <tr><td>Delete</td><td>보드에서 닫기</td></tr>
+        <tr><td>F</td><td>전체 보기 · 선택 항목 맞추기</td></tr>
+        <tr><td>D</td><td>그리기 모드 (P 펜 · A 화살표 · O 원 · E 지우개)</td></tr>
+        <tr><td>Ctrl+Z / Ctrl+Y</td><td>그림 되돌리기 / 다시 하기</td></tr>
+        <tr><td>H</td><td>그림 숨기기 / 보이기</td></tr>
+        <tr><td>Tab</td><td>탐색 패널 열기/닫기</td></tr>
+        <tr><td>Ctrl+T</td><td>항상 위</td></tr>
+        <tr><td>Ctrl+N / O / S</td><td>새 보드 / 열기 / 저장</td></tr>
+      </table>
+    </div>
+  </div>
+
+  <script src="gif.js"></script>
+  <script src="transform.js"></script>
+  <script src="sync.js"></script>
+  <script src="segments.js"></script>
+  <script src="segthumbs.js"></script>
+  <script src="update.js"></script>
+  <script src="addonsetup.js"></script>
+  <script src="media.js"></script>
+  <script src="app.js"></script>
+</body>
+</html>
