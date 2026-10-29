@@ -6,7 +6,7 @@
 
 **Put video references from your NAS on a board and watch them in step with the Blender timeline.**
 
-<!-- Paste the video URL here -->
+https://github.com/user-attachments/assets/d10ed0c0-4ee2-46a8-a33a-d09a83d5ac70
 
 - **Straight from your NAS**: browse videos on WebDAV (Synology and others) or a local / SMB folder as thumbnails and drag them onto the board.
 - **Blender connection**: scrub or play in Blender and the reference follows to the same frame. You can also show it in the viewport or as a camera background.
