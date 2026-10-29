@@ -203,4 +203,5 @@ function clipLibChanged(key, segments) {
   else delete app.clipLib[key];
   const card = app.cardByKey.get(key);
   if (card) decorateCard(card);
+  libraryChanged(); // 구간 탭
 }

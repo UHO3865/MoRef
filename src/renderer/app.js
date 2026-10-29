@@ -97,6 +97,7 @@ const ICONS = {
   image: '<rect x="3.5" y="5" width="17" height="14" rx="2"/><circle cx="9" cy="10" r="1.6"/><path d="M20.5 15.5 15 10l-8 9"/>',
   target: '<circle cx="12" cy="12" r="7.5"/><circle cx="12" cy="12" r="2.5" fill="currentColor" stroke="none"/><path d="M12 1.8v3M12 19.2v3M1.8 12h3M19.2 12h3"/>',
   plus: '<path d="M12 5v14M5 12h14"/>',
+  tag: '<path d="M3.5 12.2V4.5a1 1 0 0 1 1-1h7.7l8.3 8.3a1 1 0 0 1 0 1.4l-7.3 7.3a1 1 0 0 1-1.4 0z"/><circle cx="8" cy="8" r="1.6"/>',
   copy: '<rect x="8.5" y="8.5" width="11" height="11" rx="2"/><path d="M15.5 8.5V6.5a2 2 0 0 0-2-2h-7a2 2 0 0 0-2 2v7a2 2 0 0 0 2 2h2"/>',
   markA: '<path d="M7 4v16"/><path d="M7 5h9l-2.5 3.5L16 12H7"/>',
   markB: '<path d="M17 4v16"/><path d="M17 5H8l2.5 3.5L8 12h9"/>',
@@ -2260,6 +2261,7 @@ async function main() {
 
   initTitlebar();
   initPanel();
+  initLibrary();
   initBoard();
   initSettings();
   initDraw();

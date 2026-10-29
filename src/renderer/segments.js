@@ -15,6 +15,8 @@ const segIndex = (it, s) => it.segments.indexOf(s) + 1;
 // "구간 2 · 발 디딤" (이름이 없으면 "구간 2")
 const segName = (it, s) => tr('구간 {0}{1}', segIndex(it, s), s.name ? ` · ${s.name}` : '');
 const libKey = (it) => (it.ref.file ? `file|${it.ref.file}` : `${it.ref.sourceId}|${it.ref.path}`);
+// 구간 라이브러리에서 이 영상을 다시 열고 썸네일을 만들 때 쓰는 정보
+const libMeta = (it) => ({ ...it.ref, name: it.name, kind: it.kind });
 const mediaDur = (it) => durOf(it) || 0; // 받기 전이면 ffprobe 길이
 
 // 구간 경계는 프레임 경계에 맞춘다: 시작 = 그 프레임의 처음, 끝 = 그 프레임의 끝 (화면에 보이던 프레임까지 포함)
@@ -71,7 +73,7 @@ function initSegments(it, opts) {
       if (!segActive(it)) it.activeSeg = null;
       if (fresh && opts.openSeg == null) toast(tr('저장된 구간 {0}개를 불러왔습니다 - {1}', lib.length, it.name), 2200);
     } else if (it.segments.length) {
-      rb.clips.set(libKey(it), it.segments);
+      rb.clips.set(libKey(it), it.segments, libMeta(it));
     }
     renderSegments(it);
     if (opts.openSeg != null && it.segments.some((s) => s.id === opts.openSeg)) activateSegment(it, opts.openSeg);
@@ -81,7 +83,7 @@ function initSegments(it, opts) {
 // 구간이 바뀌었을 때: 라이브러리 저장 + 같은 파일의 다른 레퍼런스에도 반영
 function saveSegments(it) {
   const key = libKey(it);
-  rb.clips.set(key, it.segments);
+  rb.clips.set(key, it.segments, libMeta(it));
   clipLibChanged(key, it.segments);
   for (const o of app.items.values()) {
     if (o === it || !isTimed(o) || libKey(o) !== key) continue;
@@ -359,6 +361,9 @@ function segMenu(it, g, x, y) {
     { label: g === s ? tr('전체 재생으로') : tr('이 구간 반복'), icon: 'loop', action: () => activateSegment(it, g === s ? null : g.id) },
     { label: tr('시작을 지금 위치로'), icon: 'markA', action: () => editSeg(it, g, 'a') },
     { label: tr('끝을 지금 위치로'), icon: 'markB', action: () => editSeg(it, g, 'b') },
+    'sep',
+    { label: g.tags?.length ? tr('태그: {0}', g.tags.map((t) => '#' + t).join(' ')) : tr('태그…'), icon: 'tag', action: () => editTags(libKey(it), g, it) },
+    { label: tr('폴더로 옮기기…'), icon: 'folder', action: () => boardSegFolderMenu(it, g, x, y) },
     'sep',
     { label: tr('구간 삭제'), icon: 'trash', danger: true, action: () => deleteSegment(it, g.id) },
   ]);
