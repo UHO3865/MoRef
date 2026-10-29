@@ -139,7 +139,8 @@ function davUrl(src, rel) {
 }
 
 // WebDAV 요청. 응답 스트림(IncomingMessage)을 그대로 돌려준다.
-function davRequest(src, method, rel, { headers = {}, body } = {}) {
+// timeout: 응답이 이만큼 없으면 끊는다 (폴더 목록은 길게 - listDav)
+function davRequest(src, method, rel, { headers = {}, body, timeout = 30000 } = {}) {
   const url = new URL(davUrl(src, rel));
   const mod = url.protocol === 'https:' ? https : http;
   return new Promise((resolve, reject) => {
@@ -148,7 +149,7 @@ function davRequest(src, method, rel, { headers = {}, body } = {}) {
       { method, agent: agentFor(src), headers: { ...authHeader(src), ...headers } },
       resolve
     );
-    req.setTimeout(30000, () => req.destroy(new Error(tr('NAS 응답 시간 초과'))));
+    req.setTimeout(timeout, () => req.destroy(Object.assign(new Error(tr('NAS 응답 시간 초과')), { code: 'RB_TIMEOUT' })));
     req.on('error', reject);
     if (body) req.write(body);
     req.end();
@@ -181,18 +182,23 @@ function safeDecode(s) {
   }
 }
 
+const LIST_TIMEOUT_MS = 120000;
+
 async function listDav(src, rel) {
   const propfind = () =>
     davRequest(src, 'PROPFIND', rel ? rel.replace(/\/?$/, '/') : '', {
       headers: { Depth: '1', 'Content-Type': 'application/xml; charset=utf-8' },
       body: PROPFIND_BODY,
+      // 파일이 수만 개인 폴더는 NAS 가 목록을 만드는 데만 수십 초 걸린다 (테스트: 3만 개 23초, 디스크 절전 중이면 더)
+      timeout: LIST_TIMEOUT_MS,
     });
-  // 디스크 절전 중인 NAS 는 첫 요청에 10~30초 걸리거나 연결을 끊는다: 연결 오류 / 시간 초과면 한 번 더 기다린다
-  // (인증 실패 같은 HTTP 오류는 다시 하지 않는다)
+  // 디스크 절전 중인 NAS 는 연결을 끊기도 한다: 연결 오류면 한 번 더 시도한다
+  // (시간 초과는 이미 오래 기다렸으니, 인증 실패 같은 HTTP 오류는 다시 해도 같으니 다시 하지 않는다)
   let res;
   try {
     res = await propfind();
-  } catch {
+  } catch (e) {
+    if (e.code === 'RB_TIMEOUT') throw e;
     res = await propfind();
   }
   const text = await readBody(res);

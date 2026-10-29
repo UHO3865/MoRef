@@ -59,7 +59,10 @@ function serveFile(req, res, full) {
 // 받는 쪽(<video>, ffmpeg)이 천천히 읽으며 연결을 붙잡고 있으면 다른 요청이 수십 초씩 멈춘다.
 //  * 화면(<video>): 요청한 범위의 첫 조각만 돌려준다. 나머지는 브라우저가 이어서 다시 요청한다.
 //  * 그 밖(ffmpeg 등): 조각을 이어 붙여 요청한 범위를 통째로 돌려준다 (조각 사이에 연결은 비어 있다).
+//    ffmpeg 는 썸네일 하나에 필요한 양(색인 + 프레임 몇 개)보다 훨씬 많이 미리 읽어 버려서, 조각을 작게 한다.
+//    1GB 영상 측정: 4MB 조각이면 썸네일 하나에 20~40MB, 1MB 면 7~16MB (속도는 같음). 256KB 는 요청이 많아 오히려 느렸다.
 const CHUNK = 4 * 1024 * 1024;
+const CHUNK_FFMPEG = 1024 * 1024;
 
 function readAll(stream) {
   return new Promise((resolve, reject) => {
@@ -70,8 +73,8 @@ function readAll(stream) {
   });
 }
 
-async function fetchChunk(src, rel, start, end) {
-  const last = Math.min(end, start + CHUNK - 1);
+async function fetchChunk(src, rel, start, end, size) {
+  const last = Math.min(end, start + size - 1);
   const get = async () => {
     const up = await sources.davRequest(src, 'GET', rel, { headers: { Range: `bytes=${start}-${Number.isFinite(last) ? last : ''}` } });
     return { status: up.statusCode, headers: up.headers, body: await readAll(up) };
@@ -101,7 +104,9 @@ async function serveDav(req, res, src, rel) {
     const partial = !!m;
     const start = m ? Number(m[1]) : 0;
     let end = m && m[2] !== '' ? Number(m[2]) : Infinity;
-    const first = await fetchChunk(src, rel, start, end);
+    const browser = /Chrome\//.test(req.headers['user-agent'] || '');
+    const size = browser ? CHUNK : CHUNK_FFMPEG;
+    const first = await fetchChunk(src, rel, start, end, size);
     copy(first.headers);
     if (first.status === 200) {
       // NAS 가 범위를 무시하고 파일 전체를 보냈다 (작은 파일)
@@ -115,7 +120,7 @@ async function serveDav(req, res, src, rel) {
     const total = Number(/\/(\d+)$/.exec(first.headers['content-range'] || '')?.[1]);
     if (!Number.isFinite(total)) throw new Error('Content-Range 없음');
     end = Math.min(end, total - 1);
-    if (/Chrome\//.test(req.headers['user-agent'] || '')) end = start + first.body.length - 1; // 화면: 첫 조각만
+    if (browser) end = start + first.body.length - 1; // 화면: 첫 조각만
     const len = end - start + 1;
     res.writeHead(partial ? 206 : 200, {
       ...out,
@@ -130,7 +135,7 @@ async function serveDav(req, res, src, rel) {
       if (!res.write(body)) await new Promise((r) => res.once('drain', r).once('close', r));
       pos += body.length;
       if (pos > end || closed) break;
-      const next = await fetchChunk(src, rel, pos, end);
+      const next = await fetchChunk(src, rel, pos, end, size);
       if (next.status !== 206 || !next.body.length) throw new Error(tr('NAS 응답 {0}', next.status));
       body = next.body.subarray(0, end - pos + 1);
     }
