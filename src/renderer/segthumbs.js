@@ -204,4 +204,5 @@ function clipLibChanged(key, segments) {
   const card = app.cardByKey.get(key);
   if (card) decorateCard(card);
   if (app.panelOpen.has(key)) gridSegsChanged(); // 펼친 줄의 높이 / 있고 없음이 바뀜
+  libraryChanged(); // 구간 탭
 }
