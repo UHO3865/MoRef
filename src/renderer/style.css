@@ -138,7 +138,9 @@ select:focus, input:focus { border-color: var(--accent); }
   grid-auto-rows: max-content;
   gap: 6px;
   align-content: start;
+  overflow-anchor: none; /* 스크롤 위치는 renderWindow 가 맞춘다 */
 }
+.grid-spacer { grid-column: 1 / -1; }
 .card {
   background: var(--bg3);
   border-radius: 4px;

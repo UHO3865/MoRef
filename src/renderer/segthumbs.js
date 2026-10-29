@@ -137,7 +137,7 @@ function decorateCard(card) {
     ev.stopPropagation();
     if (app.panelOpen.has(card._key)) app.panelOpen.delete(card._key);
     else app.panelOpen.add(card._key);
-    decorateCard(card);
+    gridSegsChanged(); // 펼친 줄이 생기거나 없어지면 패널의 줄 나눔이 바뀐다
   };
   badge.ondblclick = (ev) => ev.stopPropagation();
   card.querySelector('.th').append(badge);
@@ -203,4 +203,5 @@ function clipLibChanged(key, segments) {
   else delete app.clipLib[key];
   const card = app.cardByKey.get(key);
   if (card) decorateCard(card);
+  if (app.panelOpen.has(key)) gridSegsChanged(); // 펼친 줄의 높이 / 있고 없음이 바뀜
 }
