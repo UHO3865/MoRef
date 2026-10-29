@@ -97,6 +97,7 @@ const ICONS = {
   image: '<rect x="3.5" y="5" width="17" height="14" rx="2"/><circle cx="9" cy="10" r="1.6"/><path d="M20.5 15.5 15 10l-8 9"/>',
   target: '<circle cx="12" cy="12" r="7.5"/><circle cx="12" cy="12" r="2.5" fill="currentColor" stroke="none"/><path d="M12 1.8v3M12 19.2v3M1.8 12h3M19.2 12h3"/>',
   plus: '<path d="M12 5v14M5 12h14"/>',
+  tag: '<path d="M3.5 12.2V4.5a1 1 0 0 1 1-1h7.7l8.3 8.3a1 1 0 0 1 0 1.4l-7.3 7.3a1 1 0 0 1-1.4 0z"/><circle cx="8" cy="8" r="1.6"/>',
   copy: '<rect x="8.5" y="8.5" width="11" height="11" rx="2"/><path d="M15.5 8.5V6.5a2 2 0 0 0-2-2h-7a2 2 0 0 0-2 2v7a2 2 0 0 0 2 2h2"/>',
   markA: '<path d="M7 4v16"/><path d="M7 5h9l-2.5 3.5L16 12H7"/>',
   markB: '<path d="M17 4v16"/><path d="M17 5H8l2.5 3.5L8 12h9"/>',
@@ -210,8 +211,10 @@ async function openFolder(rel, { refresh = false } = {}) {
   }
   if (!shown) {
     info.textContent = tr('불러오는 중…');
-    $('#grid').innerHTML = '';
-    app.cardByKey.clear();
+    vg.list = [];
+    vg.index.clear();
+    clearGridCards();
+    relayoutGrid();
   } else {
     info.textContent += tr(' · 새로 고치는 중…');
   }
@@ -302,75 +305,309 @@ const thumbEntry = (card) => {
   return { sourceId: card._sourceId, path: e.path, size: e.size, mtime: e.mtime, kind: e.kind };
 };
 
+// 받은 썸네일 결과: 화면 밖으로 나갔다가 다시 그려지는 카드에 바로 붙인다 (다시 묻지 않음)
+const thumbDone = new Map(); // 소스|경로|크기|수정시각 → { url } | { error }
+const thumbKey = (card) => `${card._sourceId}|${card._entry.path}|${card._entry.size}|${card._entry.mtime}`;
+
+function applyThumb(card, r) {
+  const th = $('.th', card);
+  if (r.url) {
+    card.thumbState = 'done';
+    th.style.backgroundImage = `url("${r.url}")`;
+    th.firstChild.textContent = '';
+  } else {
+    card.thumbState = 'error';
+    th.title = tr(r.error); // 썸네일 실패 기록(한국어 원문)도 번역
+    th.firstChild.textContent = '⚠';
+  }
+  nearObserver.unobserve(card);
+  visibleObserver.unobserve(card);
+}
+
 async function requestThumb(card, pri) {
   if (card.thumbState === 'done' || card.thumbState === 'error') return;
   if (card.thumbState === 'pending' && (pri === 'low' || card.thumbPri === 'high')) return;
   card.thumbState = 'pending';
   card.thumbPri = pri;
   const r = await rb.thumb.get(thumbEntry(card), pri);
+  if (r.url || r.error) thumbDone.set(thumbKey(card), r);
   if (!card.isConnected) return;
-  const th = $('.th', card);
-  if (r.url) {
-    card.thumbState = 'done';
-    th.style.backgroundImage = `url("${r.url}")`;
-    th.firstChild.textContent = '';
-    nearObserver.unobserve(card);
-    visibleObserver.unobserve(card);
-  } else if (r.error) {
-    card.thumbState = 'error';
-    th.title = tr(r.error); // 썸네일 실패 기록(한국어 원문)도 번역
-    th.firstChild.textContent = '⚠';
-    nearObserver.unobserve(card);
-    visibleObserver.unobserve(card);
-  } else if (card.thumbState === 'pending') {
+  if (r.url || r.error) applyThumb(card, r);
+  else if (card.thumbState === 'pending') {
     card.thumbState = null; // 취소됨 → 다시 보이면 재요청
   }
 }
 
 const boardKey = (sourceId, p) => `${sourceId}|${p}`;
 
+// ---------- 패널 목록: 보이는 줄(+ 위아래 여유)의 카드만 만든다 ----------
+// 파일이 수만 개인 폴더에서 카드를 전부 만들면 화면 메모리가 수백 MB 늘고 스크롤이 끊긴다
+// (3만 개: +860MB, 프레임 110ms). 목록은 "줄" 단위로 나누고, 화면 밖 줄은 위아래 빈 칸(spacer)의 높이로만 둔다.
+//  * 한 줄 = 카드 cols 개. 구간 썸네일 줄을 펼친 카드가 있으면 그 카드에서 줄이 끝나고 펼친 줄이 같은 블록에 붙는다.
+//  * 줄 높이는 처음엔 계산한 값, 그려 본 뒤에는 잰 값. 위쪽 줄 높이가 바뀌면 보던 자리가 흔들리지 않게 스크롤을 맞춘다.
+const GRID_OVERSCAN = 700; // 화면 위아래로 이만큼 더 그린다 (근처 썸네일 미리 받기와 같은 거리)
+
+const vg = {
+  list: [], // 필터를 거친 항목
+  index: new Map(), // 보드 키 → list 안 위치
+  blocks: [], // { start, end, seg } (list 범위, seg = 펼친 구간 줄이 붙은 블록)
+  offs: new Float64Array(1), // 블록 i 의 위쪽 = offs[i] (블록 사이 간격 포함)
+  measured: new Map(), // 블록 번호 → 잰 높이
+  est: { file: 0, dir: 0, width: 0, cols: 0 }, // 잰 카드 줄 높이 (너비 / 열 수가 바뀌면 다시)
+  cards: new Map(), // list 위치 → 카드 (지금 그려진 것)
+  from: 0,
+  to: 0,
+  top: null,
+  bottom: null,
+  raf: 0,
+};
+
+const gridCols = () => Number(gridEl.style.getPropertyValue('--cols')) || 3;
+const GRID_GAP = 6;
+
 function renderGrid() {
-  const grid = $('#grid');
-  grid.innerHTML = '';
-  app.cardByKey.clear();
   const q = $('#filter').value.trim().toLowerCase();
-  const list = q ? app.entries.filter((e) => e.name.toLowerCase().includes(q)) : app.entries;
-  updateListInfo(list);
-  const frag = document.createDocumentFragment();
-  for (const e of list) {
-    const card = h('div', 'card ' + e.kind);
-    card._entry = e;
-    card._sourceId = app.sourceId;
-    card.title = e.name;
-    const th = h('div', 'th');
-    th.append(h('span', '', e.kind === 'dir' ? '📁' : e.kind === 'image' ? '🖼' : '🎞'));
-    if (e.kind === 'video' && e.size) th.append(h('span', 'badge', fmtSize(e.size)));
-    if (e.kind === 'gif') th.append(h('span', 'badge', 'GIF'));
-    card.append(th, h('div', 'nm', e.name));
-    card.oncontextmenu = (ev) => {
-      ev.preventDefault();
-      cardMenu(ev, card);
-    };
-    if (e.kind === 'dir') {
-      card.onclick = () => openFolder(e.path);
-    } else {
-      const key = boardKey(app.sourceId, e.path);
-      card._key = key;
-      app.cardByKey.set(key, card);
-      card.draggable = true;
-      card.ondblclick = () => addFromEntry(e);
-      card.ondragstart = (ev) => {
-        ev.dataTransfer.setData('application/x-refboard', JSON.stringify({ sourceId: app.sourceId, entry: e }));
-        ev.dataTransfer.effectAllowed = 'copy';
-      };
-      markCard(card);
-      decorateCard(card); // 저장된 구간 표시 / 펼친 구간 썸네일
-      nearObserver.observe(card);
-      visibleObserver.observe(card);
+  vg.list = q ? app.entries.filter((e) => e.name.toLowerCase().includes(q)) : app.entries;
+  vg.index = new Map();
+  vg.list.forEach((e, i) => e.kind !== 'dir' && vg.index.set(boardKey(app.sourceId, e.path), i));
+  updateListInfo(vg.list);
+  clearGridCards();
+  relayoutGrid();
+}
+
+function clearGridCards() {
+  for (const card of vg.cards.values()) dropCard(card);
+  vg.cards.clear();
+  app.cardByKey.clear();
+  vg.top = h('div', 'grid-spacer');
+  vg.bottom = h('div', 'grid-spacer');
+  gridEl.replaceChildren(vg.top, vg.bottom);
+}
+
+// 블록 나누기 (항목 / 열 수 / 펼친 구간이 바뀔 때)
+function relayoutGrid() {
+  if (!vg.top) clearGridCards(); // 처음 (썸네일 크기 단계를 정할 때 불릴 수 있다)
+  const cols = gridCols();
+  const blocks = [];
+  let start = 0;
+  for (let i = 0; i < vg.list.length; i++) {
+    const e = vg.list[i];
+    const seg = e.kind !== 'dir' && app.panelOpen.has(boardKey(app.sourceId, e.path)) && app.clipLib[boardKey(app.sourceId, e.path)]?.length > 0;
+    if (seg || i - start + 1 === cols || i === vg.list.length - 1) {
+      blocks.push({ start, end: i + 1, seg, file: vg.list.slice(start, i + 1).some((x) => x.kind !== 'dir') });
+      start = i + 1;
     }
-    frag.append(card);
   }
-  grid.append(frag);
+  vg.blocks = blocks;
+  vg.measured.clear();
+  computeOffsets();
+  renderWindow();
+}
+
+function blockHeight(i) {
+  const m = vg.measured.get(i);
+  if (m != null) return m;
+  const b = vg.blocks[i];
+  const row = b.file ? vg.est.file : vg.est.dir;
+  return b.seg ? row + GRID_GAP + 150 : row;
+}
+
+function computeOffsets() {
+  const w = gridEl.clientWidth;
+  const cols = gridCols();
+  if (w !== vg.est.width || cols !== vg.est.cols) {
+    // 아직 재 보지 못한 줄: 너비로 계산 (카드 = 16:9 썸네일 + 이름 한 줄 + 테두리)
+    const cardW = Math.max(40, (w - 12 - GRID_GAP * (cols - 1)) / cols);
+    const card = Math.round((cardW * 9) / 16) + 19;
+    vg.est = { width: w, cols, file: card, dir: cols === 1 ? 38 : card };
+    vg.measured.clear();
+  }
+  const n = vg.blocks.length;
+  const offs = new Float64Array(n + 1);
+  for (let i = 0; i < n; i++) offs[i + 1] = offs[i] + blockHeight(i) + GRID_GAP;
+  vg.offs = offs;
+}
+
+// offs 에서 y 를 넘지 않는 마지막 블록
+function blockAt(y) {
+  let lo = 0;
+  let hi = vg.blocks.length - 1;
+  while (lo < hi) {
+    const mid = (lo + hi + 1) >> 1;
+    if (vg.offs[mid] <= y) lo = mid;
+    else hi = mid - 1;
+  }
+  return Math.max(0, lo);
+}
+
+function scheduleGridWindow() {
+  if (vg.raf) return;
+  vg.raf = requestAnimationFrame(() => {
+    vg.raf = 0;
+    renderWindow();
+  });
+}
+
+function renderWindow() {
+  if (!gridEl.clientWidth) return; // 패널이 숨겨져 있음 (구간 탭 / 패널 닫기): 다시 보일 때 그린다
+  for (let pass = 0; pass < 3; pass++) {
+    const n = vg.blocks.length;
+    const pad = 2; // .grid 의 위쪽 안쪽 여백
+    const y0 = gridEl.scrollTop - pad - GRID_OVERSCAN;
+    const y1 = gridEl.scrollTop - pad + gridEl.clientHeight + GRID_OVERSCAN;
+    const from = n ? blockAt(Math.max(0, y0)) : 0;
+    let to = n ? blockAt(y1) + 1 : 0;
+    to = Math.min(n, to);
+    drawBlocks(from, to);
+    if (!measureBlocks()) break; // 잰 높이가 어림과 같으면 끝, 다르면 다시 계산해서 한 번 더
+  }
+}
+
+function drawBlocks(from, to) {
+  vg.from = from;
+  vg.to = to;
+  const first = from < to ? vg.blocks[from].start : 0;
+  const last = from < to ? vg.blocks[to - 1].end : 0;
+  // 범위 밖 카드 치우기
+  for (const [i, card] of vg.cards) {
+    if (i < first || i >= last) {
+      dropCard(card);
+      vg.cards.delete(i);
+    }
+  }
+  // 위쪽 빈 칸: 앞 블록들의 높이 (뒤따르는 간격 하나는 grid gap 이 채운다)
+  const topH = vg.offs[from] - GRID_GAP;
+  vg.top.style.display = from > 0 ? '' : 'none';
+  vg.top.style.height = Math.max(0, topH) + 'px';
+  const bottomH = vg.offs[vg.blocks.length] - vg.offs[to] - GRID_GAP;
+  vg.bottom.style.display = to < vg.blocks.length ? '' : 'none';
+  vg.bottom.style.height = Math.max(0, bottomH) + 'px';
+  // 순서대로 끼워 넣기 (이미 있는 카드는 옮기지 않는다: 마우스 올림 / 끌기가 끊기지 않게)
+  let cursor = vg.top.nextSibling;
+  for (let i = first; i < last; i++) {
+    let card = vg.cards.get(i);
+    if (card) {
+      cursor = (card._segRow || card).nextSibling;
+      continue;
+    }
+    card = makeCard(vg.list[i]);
+    vg.cards.set(i, card);
+    gridEl.insertBefore(card, cursor);
+    if (card._key) decorateCard(card); // 저장된 구간 표시 / 펼친 구간 썸네일 (카드 바로 뒤에 붙는다)
+  }
+}
+
+// 그려진 블록의 실제 높이를 잰다. 어림과 달랐으면 true
+function measureBlocks() {
+  let changed = false;
+  const scrollTop = gridEl.scrollTop;
+  for (let b = vg.from; b < vg.to; b++) {
+    const blk = vg.blocks[b];
+    const card = vg.cards.get(blk.start);
+    if (!card) continue;
+    const lastEl = blk.seg ? vg.cards.get(blk.end - 1)?._segRow : null;
+    // 소수점까지 (offsetHeight 는 반올림돼서 수백 줄을 지나면 몇 px 씩 어긋난다)
+    const r0 = card.getBoundingClientRect();
+    const hgt = lastEl ? lastEl.getBoundingClientRect().bottom - r0.top : r0.height;
+    if (!hgt) continue; // 패널이 숨겨져 있음
+    const old = blockHeight(b);
+    if (!blk.seg) {
+      // 같은 종류의 줄은 높이가 같다: 한 번 재면 아직 안 그린 줄도 그 값으로
+      const kind = blk.file ? 'file' : 'dir';
+      if (Math.abs(vg.est[kind] - hgt) > 0.01) {
+        vg.est[kind] = hgt;
+        changed = true;
+      }
+    } else if (Math.abs(old - hgt) > 0.5) {
+      vg.measured.set(b, hgt);
+      changed = true;
+    }
+  }
+  if (!changed) return false;
+  // 보던 자리 유지: 첫 그려진 블록의 위치가 바뀐 만큼 스크롤도 옮긴다
+  const before = vg.offs[vg.from];
+  computeOffsets();
+  const delta = vg.offs[vg.from] - before;
+  if (delta && vg.from > 0) gridEl.scrollTop = scrollTop + delta;
+  return true;
+}
+
+function dropCard(card) {
+  nearObserver.unobserve(card);
+  visibleObserver.unobserve(card);
+  if (card.thumbState === 'pending') rb.thumb.drop(thumbEntry(card));
+  card._segRow?.remove();
+  card.remove();
+  if (card._key && app.cardByKey.get(card._key) === card) app.cardByKey.delete(card._key);
+}
+
+function makeCard(e) {
+  const card = h('div', 'card ' + e.kind);
+  card._entry = e;
+  card._sourceId = app.sourceId;
+  card.title = e.name;
+  const th = h('div', 'th');
+  th.append(h('span', '', e.kind === 'dir' ? '📁' : e.kind === 'image' ? '🖼' : '🎞'));
+  if (e.kind === 'video' && e.size) th.append(h('span', 'badge', fmtSize(e.size)));
+  if (e.kind === 'gif') th.append(h('span', 'badge', 'GIF'));
+  card.append(th, h('div', 'nm', e.name));
+  card.oncontextmenu = (ev) => {
+    ev.preventDefault();
+    cardMenu(ev, card);
+  };
+  if (e.kind === 'dir') {
+    card.onclick = () => openFolder(e.path);
+    return card;
+  }
+  const key = boardKey(app.sourceId, e.path);
+  card._key = key;
+  app.cardByKey.set(key, card);
+  card.draggable = true;
+  card.ondblclick = () => addFromEntry(e);
+  card.ondragstart = (ev) => {
+    ev.dataTransfer.setData('application/x-refboard', JSON.stringify({ sourceId: app.sourceId, entry: e }));
+    ev.dataTransfer.effectAllowed = 'copy';
+  };
+  markCard(card);
+  const done = thumbDone.get(thumbKey(card));
+  if (done) applyThumb(card, done);
+  else {
+    nearObserver.observe(card);
+    visibleObserver.observe(card);
+  }
+  return card;
+}
+
+// 펼친 구간 줄이 열리거나 닫히거나 구간 수가 바뀌면 (segthumbs.js): 블록을 다시 나눈다
+function gridSegsChanged() {
+  const keep = gridEl.scrollTop;
+  relayoutGrid();
+  gridEl.scrollTop = keep;
+  renderWindow();
+}
+
+// 목록 안의 파일 카드로 스크롤해서 그려 둔다 (화면 밖이라 아직 카드가 없을 수 있다)
+function ensureCard(key) {
+  const i = vg.index.get(key);
+  if (i == null) return null;
+  if (!vg.cards.has(i)) {
+    const b = vg.blocks.findIndex((x) => i >= x.start && i < x.end);
+    gridEl.scrollTop = Math.max(0, vg.offs[b] - gridEl.clientHeight / 2);
+    renderWindow();
+  }
+  return vg.cards.get(i) || null;
+}
+
+function initGridWindow() {
+  gridEl.addEventListener('scroll', scheduleGridWindow, { passive: true });
+  // 패널 너비 / 창 높이가 바뀌면: 카드 크기가 달라지니 다시 계산
+  new ResizeObserver(() => {
+    if (!gridEl.clientWidth) return;
+    if (gridEl.clientWidth !== vg.est.width) {
+      computeOffsets();
+      renderWindow();
+    } else scheduleGridWindow();
+  }).observe(gridEl);
 }
 
 function updateListInfo(list = app.entries) {
@@ -407,7 +644,7 @@ function boardChanged(it, delta) {
 }
 
 function flashCard(key) {
-  const card = app.cardByKey.get(key);
+  const card = ensureCard(key);
   if (!card) return;
   card.scrollIntoView({ block: 'center', behavior: 'smooth' });
   card.classList.remove('flash');
@@ -421,7 +658,7 @@ function locateInPanel(it) {
   if (document.body.classList.contains('panel-hidden')) togglePanel();
   const key = boardKey(it.ref.sourceId, it.ref.path);
   const dir = it.ref.path.split('/').slice(0, -1).join('/');
-  if (app.sourceId === it.ref.sourceId && app.cwd === dir && app.cardByKey.has(key)) return flashCard(key);
+  if (app.sourceId === it.ref.sourceId && app.cwd === dir && vg.index.has(key)) return flashCard(key);
   app.pendingLocate = key;
   if (app.sourceId !== it.ref.sourceId) {
     app.sourceId = it.ref.sourceId;
@@ -479,6 +716,7 @@ function initPanel() {
   $('#btnRefresh').onclick = () => openFolder(app.cwd, { refresh: true });
   $('#btnUp').onclick = goUp;
   $('#filter').oninput = renderGrid;
+  initGridWindow();
   initThumbSlider();
   $('#btnPanel').onclick = togglePanel;
 
@@ -522,6 +760,13 @@ function setThumbStep(i, save = true) {
   const grid = $('#grid');
   grid.style.setProperty('--cols', cols);
   grid.className = 'grid c' + cols;
+  // 한 줄 카드 수가 바뀌면 줄을 다시 나눈다 (보던 위치는 비율로 유지)
+  const ratio = grid.scrollHeight > grid.clientHeight ? grid.scrollTop / (grid.scrollHeight - grid.clientHeight) : 0;
+  relayoutGrid();
+  if (ratio) {
+    grid.scrollTop = ratio * (grid.scrollHeight - grid.clientHeight);
+    renderWindow();
+  }
   for (const [k, b] of [...$('#gridIcons').children].entries()) b.classList.toggle('on', k === i);
   if (save) rb.setSetting('thumbStep', i);
 }
@@ -2127,6 +2372,7 @@ function initSettings() {
   $('#btnClearThumbs').onclick = async () => {
     await rb.thumb.clear();
     toast(tr('썸네일 캐시를 비웠습니다'));
+    thumbDone.clear();
     renderGrid();
   };
   for (const m of document.querySelectorAll('.modal')) {
@@ -2260,6 +2506,7 @@ async function main() {
 
   initTitlebar();
   initPanel();
+  initLibrary();
   initBoard();
   initSettings();
   initDraw();

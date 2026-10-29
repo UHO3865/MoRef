@@ -125,7 +125,12 @@ function registerIpc() {
   ipcMain.handle('file:url', (_e, abs) => proxy.fileUrl(abs));
   ipcMain.handle('media:probe', (_e, ref) => probe.probe(ref));
   ipcMain.handle('clips:get', (_e, key) => clips.get(key));
-  ipcMain.handle('clips:set', (_e, key, segs) => clips.set(key, segs));
+  ipcMain.handle('clips:set', (_e, key, segs, meta) => clips.set(key, segs, meta));
+  ipcMain.handle('clips:update', (_e, key, id, patch) => clips.update(key, id, patch));
+  ipcMain.handle('clips:library', () => clips.library());
+  ipcMain.handle('clips:folders', () => clips.getFolders());
+  ipcMain.handle('clips:setFolders', (_e, list) => clips.setFolders(list));
+  ipcMain.handle('clips:clearFolders', (_e, ids) => clips.clearFolders(ids));
   ipcMain.handle('clips:keys', () => clips.keys());
   ipcMain.handle('clips:all', () => clips.all());
   ipcMain.handle('addon:status', () => addonInstall.status());
@@ -201,7 +206,7 @@ app.on('second-instance', () => {
 
 if (firstInstance) app.whenReady().then(async () => {
   if (SELFTEST) {
-    for (const f of ['config.json', 'last-board.refboard', 'blender-clips', 'thumbs', 'listings', 'probe-cache.json', 'clips.json']) {
+    for (const f of ['config.json', 'last-board.refboard', 'blender-clips', 'thumbs', 'listings', 'probe-cache.json', 'clips.json', 'range-folders.json']) {
       fs.rmSync(path.join(app.getPath('userData'), f), { recursive: true, force: true });
     }
     sources.upsertSource({

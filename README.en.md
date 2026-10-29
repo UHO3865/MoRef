@@ -15,6 +15,7 @@ A **video reference board**. Browse videos on a NAS (WebDAV) or a local/SMB fold
 - **Infinite board**: drag in videos, GIFs and images and arrange them freely. The board is saved automatically, and you can also save it as a `.refboard` file.
 - **NAS browsing**: WebDAV (Synology and others) and local/SMB folders. Thumbnail caching keeps folders with thousands of videos fast.
 - **Multiple loop ranges**: name them, keep them per file, and jump to them from range thumbnails.
+- **Range library**: organize the ranges you collect with folders / tags and find them by search.
 - **Frame-by-frame study**: step one frame at a time at the real fps, change speed, flip horizontally/vertically, grayscale, crop.
 - **Drawing**: mark up videos with pen, arrow and circle. Drawings are saved with the board.
 - **Always on top · opacity**: float the board over other apps (for example Blender).
@@ -84,6 +85,16 @@ On first launch, **Settings** opens. Add a source there.
   - Board: a reference with ranges gets a vertical strip of first-frame thumbnails, one per range. Click to loop that range; click again to play everything.
   - Panel: cards of files with saved ranges get a ⟳ count. Click it to expand the range thumbnails under the card; click one to go to that range on the board.
 - **Ranges are saved per file.** The same video opened on another board, or later, shows the same ranges.
+
+### Range library
+
+- The **Ranges** tab at the top of the left panel. Every range you make on the board is collected here automatically (at first in **Unsorted**).
+- **Folders:** create one with **＋**; right-click a folder for new subfolder / rename / delete. Deleting a folder keeps its ranges and moves them to Unsorted.
+  - Drag a range card onto a folder, or right-click it ▸ **Move to folder**. Picking a parent folder also shows the ranges in its subfolders.
+- **Tags:** right-click a card ▸ **Tags…** and enter several, separated by commas or spaces. Tags you already use can be added with a click.
+- **Find:** the search box looks in range names, file names, tags and folder names. Type `#tag` or click a tag chip at the top to keep only that tag (several = must have all).
+- Click a card to loop that range on the board. If the video isn't on the board, it is added and starts at that range.
+- The board's range chip menu also has **Tags… / Move to folder…**, and changes made on either side show up on both right away.
 
 ### Frames · flip · crop
 

@@ -21,7 +21,11 @@ const sources = require('./sources');
 const MAX_PARALLEL = 4;
 const TIMEOUT_MS = 30000;
 const GENERIC_FAIL = '썸네일 생성 실패';
-const MAX_CACHE_BYTES = 1024 * 1024 * 1024; // 1GB 를 넘으면 오래 안 쓴 것부터 정리
+// 1GB 를 넘으면 오래 안 쓴 것부터 정리 (RB_THUMB_CACHE_MB: 테스트용으로 줄이기)
+const MAX_CACHE_BYTES = (Number(process.env.RB_THUMB_CACHE_MB) || 1024) * 1024 * 1024;
+// 앱을 켠 채로 큰 폴더를 계속 훑으면 캐시가 계속 늘어나므로, 새로 만든 썸네일이 이만큼 쌓일 때마다 다시 정리한다
+// (썸네일 하나 평균 16KB: 300개 = 약 5MB)
+const PRUNE_EVERY = 300;
 const BLACK_LEVEL = 18; // 8x8 평균 밝기가 이보다 낮으면 "검은 첫 프레임"
 const cacheDir = () => path.join(app.getPath('userData'), 'thumbs');
 const failedFile = () => path.join(cacheDir(), 'failed.json');
@@ -30,6 +34,8 @@ const index = new Set(); // 캐시에 있는 키
 let indexReady = false;
 let failed = {}; // 키 → 오류 메시지
 const touched = new Set();
+let added = 0; // 마지막 정리 뒤 새로 만든 썸네일 수
+let pruning = null;
 
 const jobs = new Map(); // 키 → job (대기 또는 실행 중)
 const high = []; // 화면에 보이는 것: 최근 요청부터
@@ -67,7 +73,13 @@ async function init() {
   setTimeout(prune, 15000).unref?.();
 }
 
-async function prune() {
+function prune() {
+  added = 0;
+  if (!pruning) pruning = doPrune().catch(() => {}).finally(() => (pruning = null));
+  return pruning;
+}
+
+async function doPrune() {
   const files = [];
   let total = 0;
   for (const key of index) {
@@ -215,6 +227,7 @@ function get(entry, pri = 'high') {
       if (r.ok && fs.existsSync(tmp) && fs.statSync(tmp).size > 0) {
         fs.renameSync(tmp, out);
         index.add(key);
+        if (++added >= PRUNE_EVERY && indexReady) prune();
         resolve({ file: out });
       } else {
         fs.rmSync(tmp, { force: true });

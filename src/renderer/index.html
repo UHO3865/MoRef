@@ -40,6 +40,10 @@
 
   <main id="main">
     <aside id="panel">
+      <div class="panel-tabs">
+        <button id="tabFiles" class="on" title="NAS / 폴더의 파일">파일</button>
+        <button id="tabRanges" title="구간 라이브러리 - 저장한 구간을 폴더 / 태그로 정리하고 찾기">구간</button>
+      </div>
       <div class="panel-head">
         <select id="sourceSelect" title="소스"></select>
         <button id="btnRefresh" class="icon-btn" title="새로고침">⟳</button>
@@ -51,6 +55,14 @@
       <input id="filter" class="filter" type="search" placeholder="현재 폴더에서 검색…" />
       <div id="listInfo" class="list-info"></div>
       <div id="grid" class="grid"></div>
+      <div id="libView" class="lib-view">
+        <input id="libSearch" class="filter" type="search" placeholder="구간 이름 · 파일 · 태그 검색 (#태그)" />
+        <div class="lib-folders-head"><span>폴더</span><button id="libNewFolder" class="icon-btn" title="새 폴더">＋</button></div>
+        <div id="libFolders" class="lib-folders"></div>
+        <div id="libTags" class="lib-tags"></div>
+        <div id="libInfo" class="list-info"></div>
+        <div id="libList" class="lib-list"></div>
+      </div>
       <div class="size-ctl" title="썸네일 크기 - 끌면 정해진 크기에 자석처럼 붙습니다">
         <div id="thumbSize" class="snap" tabindex="0" role="slider" aria-label="썸네일 크기">
           <div class="snap-track"><div class="snap-fill"></div><div id="snapTicks" class="snap-ticks"></div></div>
@@ -194,6 +206,7 @@
   <script src="sync.js"></script>
   <script src="segments.js"></script>
   <script src="segthumbs.js"></script>
+  <script src="library.js"></script>
   <script src="update.js"></script>
   <script src="addonsetup.js"></script>
   <script src="media.js"></script>
