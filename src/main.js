@@ -18,6 +18,24 @@ if (SELFTEST) {
   app.commandLine.appendSwitch('disable-features', 'CalculateNativeWinOcclusion');
   app.commandLine.appendSwitch('disable-renderer-backgrounding');
   app.commandLine.appendSwitch('disable-backgrounding-occluded-windows');
+} else {
+  useUserData();
+}
+
+// 설정 / 캐시 폴더: %APPDATA%\MoRef. 이름을 바꾸기 전(RefBoard)의 폴더가 있으면 그대로 옮겨 쓴다.
+// 옮기지 못하면(파일이 잡혀 있는 등) 예전 폴더를 계속 쓴다 (Blender 애드온도 두 곳을 모두 찾는다)
+function useUserData() {
+  const dir = path.join(app.getPath('appData'), 'MoRef');
+  const old = path.join(app.getPath('appData'), 'RefBoard');
+  let use = dir;
+  if (!fs.existsSync(dir) && fs.existsSync(old)) {
+    try {
+      fs.renameSync(old, dir);
+    } catch {
+      use = old;
+    }
+  }
+  app.setPath('userData', use);
 }
 
 let win;
@@ -36,7 +54,7 @@ function createWindow() {
     frame: false,
     backgroundColor: '#1b1b1d',
     alwaysOnTop: !!settings.alwaysOnTop,
-    title: 'RefBoard',
+    title: 'MoRef',
     icon: path.join(__dirname, '..', 'assets', 'icon.ico'),
     webPreferences: {
       preload: path.join(__dirname, 'preload.js'),
@@ -160,11 +178,11 @@ function registerIpc() {
   });
 
   // ---- 보드 파일 ----
-  const filters = [{ name: i18n.tr('RefBoard 보드'), extensions: ['refboard'] }];
+  const filters = [{ name: i18n.tr('MoRef 보드'), extensions: ['moref', 'refboard'] }]; // .refboard: 이름을 바꾸기 전에 저장한 보드
 
   ipcMain.handle('board:save', async (_e, json, filePath) => {
     if (!filePath) {
-      const r = await dialog.showSaveDialog(win, { filters, defaultPath: 'board.refboard' });
+      const r = await dialog.showSaveDialog(win, { filters, defaultPath: 'board.moref' });
       if (r.canceled) return null;
       filePath = r.filePath;
     }
@@ -191,10 +209,10 @@ function registerIpc() {
   });
 }
 
-// 작업 표시줄에서 electron.exe 가 아니라 RefBoard 로 묶이게
-app.setAppUserModelId('RefBoard');
+// 작업 표시줄에서 electron.exe 가 아니라 MoRef 로 묶이게
+app.setAppUserModelId('MoRef');
 
-// 하나만 띄운다: 이미 켜져 있으면 (바로 가기 / Blender 의 RefBoard 열기) 그 창을 앞으로 가져오고 끝낸다
+// 하나만 띄운다: 이미 켜져 있으면 (바로 가기 / Blender 의 MoRef 열기) 그 창을 앞으로 가져오고 끝낸다
 const firstInstance = SELFTEST || app.requestSingleInstanceLock();
 if (!firstInstance) app.quit();
 app.on('second-instance', () => {
@@ -227,7 +245,7 @@ if (firstInstance) app.whenReady().then(async () => {
   if (!SELFTEST || process.env.RB_ADDON_TEST) win.webContents.once('did-finish-load', checkBlenderAddon);
 });
 
-// Blender 애드온이 RefBoard 를 켤 수 있게, 실행 파일 위치를 적어 둔다 (설치판 / 소스 폴더 모두)
+// Blender 애드온이 MoRef 를 켤 수 있게, 실행 파일 위치를 적어 둔다 (설치판 / 소스 폴더 모두)
 function rememberAppPath() {
   const info = { exe: process.execPath, args: app.isPackaged ? [] : [app.getAppPath()] };
   fs.promises.writeFile(path.join(app.getPath('userData'), 'app-path.json'), JSON.stringify(info)).catch(() => {});

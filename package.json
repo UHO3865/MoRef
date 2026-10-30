@@ -1,6 +1,6 @@
 {
-  "name": "refboard",
-  "productName": "RefBoard",
+  "name": "moref",
+  "productName": "MoRef",
   "version": "0.4.0",
   "description": "PureRef 스타일 영상 레퍼런스 보드 - NAS(WebDAV)·로컬 폴더의 영상을 보드에 띄우고 Blender와 연결",
   "main": "src/main.js",
@@ -23,7 +23,7 @@
   "author": "ddb27",
   "build": {
     "appId": "com.refboard.app",
-    "productName": "RefBoard",
+    "productName": "MoRef",
     "copyright": "Copyright (c) 2026 ddb27",
     "directories": {
       "output": "dist"
@@ -46,8 +46,8 @@
       "allowToChangeInstallationDirectory": true,
       "createDesktopShortcut": true,
       "createStartMenuShortcut": true,
-      "shortcutName": "RefBoard",
-      "artifactName": "RefBoard-Setup-${version}.${ext}",
+      "shortcutName": "MoRef",
+      "artifactName": "MoRef-Setup-${version}.${ext}",
       "installerIcon": "assets/icon.ico",
       "uninstallerIcon": "assets/icon.ico"
     },

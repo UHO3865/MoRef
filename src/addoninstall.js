@@ -1,12 +1,12 @@
 // Blender 애드온 설치 / 업데이트
 //
-// 애드온은 RefBoard 안에 함께 들어 있다 (설치판: resources/blender-addon, 소스: blender/).
+// 애드온은 MoRef 안에 함께 들어 있다 (설치판: resources/blender-addon, 소스: blender/).
 //  * 찾기: %APPDATA%\Blender Foundation\Blender\<버전> (써 본 Blender) + Program Files 의 Blender <버전> (설치된 Blender)
 //    중 애드온이 지원하는 버전(4.2 이상).
 //  * 설치: <설정>\scripts\addons\refboard_dock 에 복사한다.
 //  * 켜기: Blender 가 켜져 있으면 설정을 직접 바꿀 수 없어서(끌 때 덮어씀), 시작 스크립트를 하나 넣어 둔다.
 //    다음에 Blender 를 켤 때 애드온을 켜고 설정을 저장한 뒤 스스로 지워진다.
-//  * 업데이트: 이미 설치된 애드온이 더 오래됐으면 RefBoard 를 켤 때 자동으로 바꾼다.
+//  * 업데이트: 이미 설치된 애드온이 더 오래됐으면 MoRef 를 켤 때 자동으로 바꾼다.
 const fs = require('fs');
 const path = require('path');
 const { app } = require('electron');
@@ -74,7 +74,7 @@ function status() {
 }
 
 // 다음에 Blender 를 켤 때 애드온을 켜고 지워지는 시작 스크립트
-const ENABLER_SOURCE = `# RefBoard 가 넣은 일회용 스크립트: "RefBoard 연결" 애드온을 켜고 설정을 저장한 뒤 스스로 지운다
+const ENABLER_SOURCE = `# MoRef 가 넣은 일회용 스크립트: "MoRef 연결" 애드온을 켜고 설정을 저장한 뒤 스스로 지운다
 import os
 
 import bpy
@@ -86,9 +86,9 @@ def _enable():
 
         addon_utils.enable("${MODULE}", default_set=True, persistent=True)
         bpy.ops.wm.save_userpref()
-        print("RefBoard: '${MODULE}' 애드온을 켰습니다")
+        print("MoRef: '${MODULE}' 애드온을 켰습니다")
     except Exception as e:
-        print("RefBoard: 애드온을 켜지 못했습니다", e)
+        print("MoRef: 애드온을 켜지 못했습니다", e)
     try:
         os.remove(__file__)
     except OSError:
@@ -136,7 +136,7 @@ function install(versions = blenderVersions(), { enable = true } = {}) {
   return results;
 }
 
-// RefBoard 를 켤 때: 설치돼 있지만 오래된 애드온은 조용히 바꾼다 (켜기 상태는 그대로 - 같은 모듈 이름)
+// MoRef 를 켤 때: 설치돼 있지만 오래된 애드온은 조용히 바꾼다 (켜기 상태는 그대로 - 같은 모듈 이름)
 function updateOutdated() {
   const st = status();
   const old = st.blenders.filter((b) => b.outdated).map((b) => b.version);

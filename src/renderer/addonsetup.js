@@ -3,7 +3,7 @@
 // Blender 애드온 설치 안내 (src/addoninstall.js)
 //  * 처음 실행 때 애드온이 없는 Blender 가 있으면 위쪽 띠로 한 번 묻는다: [설치] [나중에] [다시 묻지 않기]
 //  * 설정(⚙)의 "Blender 애드온 설치 / 업데이트" 버튼
-//  * RefBoard 를 켤 때 오래된 애드온을 바꿨으면 알려 준다
+//  * MoRef 를 켤 때 오래된 애드온을 바꿨으면 알려 준다
 
 const fmtVer = (v) => (v ? v.join('.') : '');
 
@@ -15,7 +15,7 @@ function initAddonSetup() {
   rb.addon.onOffer((versions) => {
     const ic = h('span', 'ic-wrap');
     ic.innerHTML = icon('link');
-    bar.replaceChildren(ic, h('span', 'msg', tr('Blender {0} 에 RefBoard 애드온을 설치할까요? (타임라인 동기화 · 뷰포트에 영상 띄우기)', versions.join(', '))));
+    bar.replaceChildren(ic, h('span', 'msg', tr('Blender {0} 에 MoRef 애드온을 설치할까요? (타임라인 동기화 · 뷰포트에 영상 띄우기)', versions.join(', '))));
     const btn = (label, cls, fn) => {
       const b = h('button', cls, label);
       b.onclick = fn;
@@ -33,7 +33,7 @@ function initAddonSetup() {
     bar.hidden = false;
   });
 
-  rb.addon.onUpdated((versions) => toast(tr('Blender {0} 의 RefBoard 애드온을 새 버전으로 바꿨습니다 - Blender 를 다시 켜면 적용됩니다', versions.join(', ')), 4000));
+  rb.addon.onUpdated((versions) => toast(tr('Blender {0} 의 MoRef 애드온을 새 버전으로 바꿨습니다 - Blender 를 다시 켜면 적용됩니다', versions.join(', ')), 4000));
 
   $('#btnAddon').onclick = () => installBlenderAddon();
   initLanguagePicker();

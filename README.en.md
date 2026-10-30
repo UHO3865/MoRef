@@ -1,8 +1,8 @@
-<p align="center"><img src="assets/icon.png" width="96" alt="RefBoard logo"></p>
+<p align="center"><img src="assets/icon.png" width="96" alt="MoRef logo"></p>
 
 <p align="center"><a href="README.md">한국어</a> · <b>English</b> · <a href="README.ja.md">日本語</a></p>
 
-# RefBoard
+# MoRef
 
 **Put video references from your NAS on a board and watch them in step with the Blender timeline.**
 
@@ -18,8 +18,8 @@ Download from [Releases](../../releases).
 
 | File | Contents |
 | --- | --- |
-| `RefBoard-Setup-x.y.z.exe` | Windows installer (Windows 10/11, 64-bit) |
-| `RefBoard-Blender-Addon-x.y.z.zip` | Blender add-on (Blender 4.2 or later). It is also included in the installer, so you don't need to download it separately |
+| `MoRef-Setup-x.y.z.exe` | Windows installer (Windows 10/11, 64-bit) |
+| `MoRef-Blender-Addon-x.y.z.zip` | Blender add-on (Blender 4.2 or later). It is also included in the installer, so you don't need to download it separately |
 
 - The installer is not code-signed, so SmartScreen may warn you the first time. Click **More info ▸ Run anyway**.
 - **FFmpeg is required.** If it is on your PATH it is used as is; otherwise set the path to `ffmpeg.exe` in the settings.
@@ -28,7 +28,7 @@ Download from [Releases](../../releases).
   winget install Gyan.FFmpeg
   ```
 
-- On first launch RefBoard asks whether to install the Blender add-on. Click **Install** and it turns on the next time you start Blender.
+- On first launch MoRef asks whether to install the Blender add-on. Click **Install** and it turns on the next time you start Blender.
 
 ## Connect your NAS
 
@@ -65,7 +65,7 @@ npm run addon
 
 ## Support
 
-If RefBoard helps you, you can buy me a coffee.
+If MoRef helps you, you can buy me a coffee.
 
 <a href="https://buymeacoffee.com/uho3865"><img src="https://img.shields.io/badge/Buy%20Me%20a%20Coffee-ffdd00?style=for-the-badge&logo=buy-me-a-coffee&logoColor=black" alt="Buy Me a Coffee"></a>
 
