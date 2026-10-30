@@ -1456,3 +1456,19 @@ body.lib-mode .panel-head, body.lib-mode .panel-nav, body.lib-mode #filter, body
 .ask-msg { line-height: 1.5; overflow-wrap: anywhere; }
 .btn.primary.danger { background: var(--danger); border-color: var(--danger); color: #fff; }
 .btn.primary.danger:hover { filter: brightness(1.1); color: #fff; }
+
+/* 썸네일 꾹 눌러 미리 보기 (peek.js) */
+.peek {
+  position: fixed;
+  z-index: 110000; /* 보드의 컨트롤 층 / 그리기 막대보다 위, 메뉴(120000)보다 아래 */
+  background: #000 center / contain no-repeat;
+  border: 1px solid var(--accent);
+  border-radius: 6px;
+  overflow: hidden;
+  box-shadow: 0 10px 32px #000b;
+  pointer-events: none;
+}
+.peek video, .peek img { display: block; width: 100%; max-height: 60vh; min-height: 90px; object-fit: contain; }
+.peek .nm { font-size: 11px; padding: 3px 8px; background: var(--bg2); color: var(--fg2); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.peek .err { padding: 28px 12px; font-size: 12px; color: var(--danger); text-align: center; background: var(--bg2); }
+.card.peeking { border-color: var(--accent); }

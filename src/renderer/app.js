@@ -559,6 +559,7 @@ function makeCard(e) {
     card.onclick = () => openFolder(e.path);
     return card;
   }
+  card.title = `${e.name}\n${tr('꾹 누르고 있으면 미리 보기')}`; // peek.js
   const key = boardKey(app.sourceId, e.path);
   card._key = key;
   app.cardByKey.set(key, card);
@@ -2527,6 +2528,7 @@ async function main() {
   initBlenderLink();
   initUpdateNotice();
   initAddonSetup();
+  initPeek();
   initMediaSaver();
   initKeys();
   requestAnimationFrame(tick);
