@@ -127,8 +127,10 @@ function closeOnion(it) {
   clearFrames(it);
   it.onionFrames = null;
   if (it.onionVid) {
+    it.onionVid.pause();
     it.onionVid.removeAttribute('src');
     it.onionVid.load(); // NAS 스트림을 닫는다
+    it.onionVid.remove();
     it.onionVid = null;
   }
 }
@@ -181,29 +183,38 @@ async function renderOnion(it, f, gen) {
   if (!cur) return;
   const total = it.kind === 'gif' ? it.media.frameCount : totalFrames(it);
   const { b, a } = it.onion;
-  // 먼 프레임부터 (가까운 프레임이 위에 오게). 하나 읽을 때마다 다시 합쳐 보여 준다
-  const ghosts = [];
-  const out = gpu ? null : ctx.createImageData(W, H);
+  // 먼 프레임부터 (가까운 프레임이 위에 오게)
+  const want = [];
   for (let d = Math.max(b, a); d >= 1; d--) {
     for (const dir of [-1, 1]) {
       const n = dir < 0 ? b : a;
-      if (d > n) continue;
       const i = f + dir * d;
-      if (i < 0 || i >= total) continue;
-      const bmp = await onionFrame(it, i, W, H);
-      if (gen !== it.onionGen) return;
-      if (!bmp) continue;
-      const g = { bmp, tint: dir < 0 ? ONION_BEFORE : ONION_AFTER, alpha: 0.75 * (1 - (d - 1) / (n + 1)) };
-      if (gpu) {
-        ghosts.push(g);
-        if (!blendGpu(gpu, cur, ghosts, W, H)) return; // 영상 프레임을 올리지 못함 (아주 드묾): 다음에
-        ctx.clearRect(0, 0, W, H);
-        ctx.drawImage(gpu.canvas, 0, 0);
-      } else {
-        const gd = grab(bmp, W, H);
-        if (gd) blendGhost(out.data, cur.data, gd.data, g.tint, g.alpha);
-        ctx.putImageData(out, 0, 0);
-      }
+      if (d <= n && i >= 0 && i < total) want.push({ i, d, dir, n });
+    }
+  }
+  // 영상: 없는 프레임을 한 번에 읽는다 (한 번 이동 + 천천히 재생하며 잡기 - readVideoFrames)
+  if (it.kind === 'video') {
+    const missing = want.map((w) => w.i).filter((i) => !it.onionFrames?.has(i));
+    if (missing.length) await readVideoFrames(it, Math.min(...missing), Math.max(...missing), W, H);
+    if (gen !== it.onionGen) return;
+  }
+  // 하나 읽을 때마다 다시 합쳐 보여 준다 (GIF · 영상에서 놓친 프레임은 하나씩 읽는다)
+  const ghosts = [];
+  const out = gpu ? null : ctx.createImageData(W, H);
+  for (const { i, d, dir, n } of want) {
+    const bmp = await onionFrame(it, i, W, H);
+    if (gen !== it.onionGen) return;
+    if (!bmp) continue;
+    const g = { bmp, tint: dir < 0 ? ONION_BEFORE : ONION_AFTER, alpha: 0.75 * (1 - (d - 1) / (n + 1)) };
+    if (gpu) {
+      ghosts.push(g);
+      if (!blendGpu(gpu, cur, ghosts, W, H)) return; // 영상 프레임을 올리지 못함 (아주 드묾): 다음에
+      ctx.clearRect(0, 0, W, H);
+      ctx.drawImage(gpu.canvas, 0, 0);
+    } else {
+      const gd = grab(bmp, W, H);
+      if (gd) blendGhost(out.data, cur.data, gd.data, g.tint, g.alpha);
+      ctx.putImageData(out, 0, 0);
     }
   }
 }
@@ -323,16 +334,22 @@ async function onionFrame(it, i, W, H) {
     return hit;
   }
   const img = it.kind === 'gif' ? await gifFrame(it, i, W, H) : await videoFrame(it, i, W, H);
-  if (!img) return null;
+  return img && storeFrame(it, i, img);
+}
+
+function storeFrame(it, i, img) {
   if (!it.onionFrames) {
     img.close(); // 기다리는 사이에 꺼졌다
     return null;
   }
+  const old = it.onionFrames.get(i);
+  if (old && old !== img) old.close();
+  it.onionFrames.delete(i);
   it.onionFrames.set(i, img);
   while (it.onionFrames.size > onionCacheSize(it)) {
-    const [k, old] = it.onionFrames.entries().next().value;
+    const [k, first] = it.onionFrames.entries().next().value;
     it.onionFrames.delete(k);
-    old.close();
+    first.close();
   }
   return img;
 }
@@ -354,20 +371,82 @@ async function gifFrame(it, i, W, H) {
   return img;
 }
 
-// 숨은 <video> 로 그 프레임까지 이동해서 읽는다. 한 번에 하나씩 (이동이 겹치면 다른 프레임을 읽는다)
+// 옆 프레임을 읽는 숨은 <video>. 프레임마다 그리는 시점을 받으려면(requestVideoFrameCallback) 문서 안에 있어야 해서
+// 보이지 않게 붙여 둔다. 받는 요청은 보드 재생보다 뒤로 (주소의 bg=1 - proxy.js)
+function onionHelper(it) {
+  if (it.onionVid) return it.onionVid;
+  if (!it.onionCv || !it.srcUrl) return null;
+  const v = (it.onionVid = h('video', 'onion-helper'));
+  v.muted = true;
+  v.preload = 'auto';
+  v.crossOrigin = 'anonymous'; // 프레임을 읽으려면
+  v.src = it.srcUrl + (it.srcUrl.includes('?') ? '&' : '?') + 'bg=1';
+  document.body.append(v);
+  return v;
+}
+
+// 이동할 때마다 Chromium 은 앞 키프레임부터 다시 풀고, 큰 영상은 그만큼을 NAS 에서 다시 받는다
+// (4K 40Mbps, 앞뒤 2장: 프레임마다 이동하면 2.9초 · 133MB, 이 방식은 1.1초 · 48MB).
+// 그래서 lo 로 한 번만 이동하고, 천천히 재생하며 lo~hi 의 프레임을 모두 잡는다.
+// 숨은 영상이 이미 바로 앞(ONION_AHEAD 안)에 있으면 이동하지 않고 이어서 재생한다 (→ 로 한 칸씩 넘길 때)
+const ONION_RATE = 0.5;
+const ONION_AHEAD = 30;
+function readVideoFrames(it, lo, hi, W, H) {
+  const run = async () => {
+    const v = onionHelper(it);
+    if (!v) return;
+    it.onionFrames ??= new Map(); // 잡은 프레임을 둘 곳 (onionFrame 보다 먼저 불린다)
+    if (v.readyState < 1 && !(await once(v, 'loadedmetadata'))) return;
+    const fps = fpsOf(it);
+    const frameOf = (t) => Math.floor(t * fps + 0.01);
+    const keep = (i) => {
+      if (i < lo || i > hi || !it.onionFrames) return;
+      shrink(v, W, H).then((img) => storeFrame(it, i, img), () => {});
+    };
+    const pos = frameOf(v.currentTime);
+    if (!(v.readyState >= 2 && lo > pos && lo - pos <= ONION_AHEAD)) {
+      v.currentTime = (lo + 0.5) / fps; // 프레임 가운데 (seekFrame 과 같게)
+      if (!(await once(v, 'seeked'))) return;
+      keep(lo);
+      if (hi === lo) return;
+    }
+    const start = frameOf(v.currentTime);
+    await new Promise((resolve) => {
+      let timer = 0;
+      const done = () => {
+        clearTimeout(timer);
+        v.onended = null;
+        v.pause();
+        resolve();
+      };
+      timer = setTimeout(done, ((hi - start + 2) / fps / ONION_RATE) * 1000 + 4000);
+      const onFrame = (_now, meta) => {
+        const i = frameOf(meta.mediaTime);
+        if (i >= hi || !it.onionCv) {
+          keep(i);
+          return done();
+        }
+        v.requestVideoFrameCallback(onFrame); // 먼저 다음 것을 걸어 둔다 (잡는 동안 지나가지 않게)
+        keep(i);
+      };
+      v.requestVideoFrameCallback(onFrame);
+      v.onended = done;
+      v.playbackRate = ONION_RATE;
+      v.play().catch(done);
+    });
+    await new Promise((r) => setTimeout(r, 0)); // 마지막으로 잡은 것이 저장되게
+  };
+  it.onionQ = (it.onionQ || Promise.resolve()).then(run, run);
+  return it.onionQ;
+}
+
+// 하나만 읽기 (재생하며 잡다가 놓친 프레임): 그 프레임으로 이동해서
 function videoFrame(it, i, W, H) {
   const run = async () => {
-    if (!it.onionCv || !it.srcUrl) return null;
-    let v = it.onionVid;
-    if (!v) {
-      v = it.onionVid = h('video');
-      v.muted = true;
-      v.preload = 'auto';
-      v.crossOrigin = 'anonymous'; // 프레임을 읽으려면
-      v.src = it.srcUrl;
-    }
+    const v = onionHelper(it);
+    if (!v) return null;
     if (v.readyState < 1 && !(await once(v, 'loadedmetadata'))) return null;
-    v.currentTime = (i + 0.5) / fpsOf(it); // 프레임 가운데 (seekFrame 과 같게)
+    v.currentTime = (i + 0.5) / fpsOf(it);
     if (!(await once(v, 'seeked'))) return null;
     return shrink(v, W, H).catch(() => null);
   };

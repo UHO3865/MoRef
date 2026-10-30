@@ -1373,7 +1373,7 @@ function updateFpsUi(it) {
 
 function updatePlayBtn(it) {
   wakeTick(); // 재생 / 멈춤 (영상 · GIF)
-  if (!it.ctl) return;
+  if (!it.ctl || it.playStep) return; // → 한 칸을 재생으로 넘기는 중: 재생 버튼은 그대로
   const paused = it.media.paused;
   it.ctl.play.innerHTML = icon(paused ? 'play' : 'pause');
   it.el.classList.toggle('paused', paused);
@@ -1414,14 +1414,60 @@ function step(it, dt) {
     it.media.stepFrame(dt > 0 ? 1 : -1);
     return realignSync(it);
   }
-  it.media.pause();
   if (it.kind === 'video') {
     const n = Math.abs(dt) < 0.5 ? Math.sign(dt) : Math.round(dt * fpsOf(it));
+    if (n === 1 && stepByPlay(it)) return;
+    it.media.pause();
     seekFrame(it, currentFrame(it) + n);
     return realignSync(it);
   }
+  it.media.pause();
   it.media.currentTime = Math.max(0, Math.min(it.media.duration || 0, it.media.currentTime + dt));
 }
+// → 한 칸: 이동(seek)하면 Chromium 은 앞 키프레임부터 다시 풀고, 큰 영상은 그만큼을 NAS 에서 다시 받는다
+// (4K 40Mbps · 키프레임 10초 간격: 한 번에 0.6~0.9초, 10~30MB). 다음 프레임은 이미 받아 둔 바로 뒤라서
+// 잠깐 재생했다가 다음 프레임이 화면에 나오면 멈춘다. 빨리 여러 번 누르면 목표만 늘린다.
+// 쓸 수 없으면 false (멈춰 있지 않음 · 이동 중 · 아직 못 받음 · 끝) → 이동으로
+const STEP_RATE = 0.5;
+function stepByPlay(it) {
+  const v = it.media;
+  if (it.playStep) {
+    it.playStep.target = Math.min(it.playStep.target + 1, totalFrames(it) - 1);
+    return true;
+  }
+  if (!v.paused || v.seeking || it.pendingSeek != null || v.readyState < 3 || it.unloaded || !('requestVideoFrameCallback' in v)) return false;
+  const target = currentFrame(it) + 1;
+  const fps = fpsOf(it);
+  if (target >= totalFrames(it)) return false;
+  if (it.b != null && (target + 1) / fps > it.b) return false; // 반복 구간 끝을 넘으면 tick() 이 처음으로 되돌린다
+  const st = (it.playStep = { target, rate: v.playbackRate });
+  const finish = (ok) => {
+    clearTimeout(st.timer);
+    v.pause();
+    v.playbackRate = st.rate;
+    it.playStep = null;
+    updatePlayBtn(it);
+    if (!ok) seekFrame(it, st.target);
+    realignSync(it, (st.target + 0.5) / fps);
+  };
+  const arm = () => {
+    clearTimeout(st.timer);
+    st.timer = setTimeout(() => finish(false), 1500); // 다음 프레임이 안 나오면 (받는 중 등) 이동으로
+  };
+  const onFrame = (_now, meta) => {
+    if (it.playStep !== st) return;
+    const i = Math.floor(meta.mediaTime * fps + 0.01);
+    if (i >= st.target) return finish(i === st.target);
+    arm();
+    v.requestVideoFrameCallback(onFrame);
+  };
+  arm();
+  v.requestVideoFrameCallback(onFrame);
+  v.playbackRate = STEP_RATE;
+  v.play().catch(() => finish(false));
+  return true;
+}
+
 function changeSpeed(it, dir) {
   if (!isTimed(it)) return;
   let i = SPEEDS.indexOf(it.rate);
