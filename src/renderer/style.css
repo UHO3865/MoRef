@@ -35,12 +35,13 @@ button, input, select { font: inherit; color: inherit; }
 }
 #titlebar button, #titlebar input, #titlebar label { -webkit-app-region: no-drag; }
 .tb-left, .tb-mid, .tb-right { display: flex; align-items: center; height: 100%; }
-.tb-left { padding-left: 4px; gap: 6px; min-width: 0; flex: 1; }
-.tb-mid { gap: 2px; }
-.tb-right { flex: 1; justify-content: flex-end; }
+.tb-left { padding-left: 4px; gap: 6px; min-width: 0; flex: 1; overflow: hidden; }
+.tb-mid { gap: 2px; min-width: 0; overflow: hidden; }
+.tb-right { flex: 1 0 auto; justify-content: flex-end; } /* 창 버튼은 줄어들거나 밀려나지 않게 */
+#btnPanel, .app-logo { flex-shrink: 0; }
 .app-name { font-weight: 600; color: var(--fg2); }
 .app-logo { width: 18px; height: 18px; margin-left: 4px; display: block; }
-.board-name { color: var(--fg); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.board-name { color: var(--fg); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; min-width: 0; }
 .tb-btn {
   height: 24px;
   padding: 0 8px;
@@ -66,8 +67,24 @@ button, input, select { font: inherit; color: inherit; }
 }
 .win-btn:hover { background: var(--bg3); }
 .win-btn.close:hover { background: #c42b1c; color: #fff; }
+/* 창이 좁아지면 단축키가 있는 것부터 숨기고, 글자 버튼은 아이콘만 남긴다 */
 @media (max-width: 760px) {
-  .opacity span, .app-name { display: none; }
+  .opacity span, .app-name, #btnNew, #btnFit { display: none; }
+}
+@media (max-width: 640px) {
+  #titlebar .sep { display: none; }
+  .opacity input { width: 56px; }
+  #btnPin, #btnDraw { font-size: 0; gap: 0; }
+  #btnPin::before { content: "📌"; font-size: 13px; }
+}
+@media (max-width: 500px) {
+  .opacity, #btnHelp, .board-name { display: none; }
+}
+@media (max-width: 420px) {
+  #btnOpen, #btnSave { display: none; }
+}
+@media (max-width: 360px) {
+  .app-logo { display: none; }
 }
 
 /* ---------- layout ---------- */
@@ -1397,3 +1414,6 @@ body.lib-mode .panel-head, body.lib-mode .panel-nav, body.lib-mode #filter, body
 .ask-input { background: var(--bg3); color: var(--fg); border: 1px solid #ffffff24; border-radius: 6px; padding: 7px 9px; }
 .ask-sug { display: flex; flex-wrap: wrap; gap: 4px; max-height: 110px; overflow-y: auto; }
 .ask-row { display: flex; justify-content: flex-end; gap: 6px; }
+.ask-msg { line-height: 1.5; overflow-wrap: anywhere; }
+.btn.primary.danger { background: var(--danger); border-color: var(--danger); color: #fff; }
+.btn.primary.danger:hover { filter: brightness(1.1); color: #fff; }
