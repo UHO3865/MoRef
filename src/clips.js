@@ -4,30 +4,25 @@
 //                    키 = "<소스>|<경로>" (NAS) 또는 "file|<절대 경로>" (탐색기에서 끌어온 파일)
 //                    meta = { sourceId?, path?, file?, name, kind, size?, mtime? } - 라이브러리에서 열고 썸네일을 만들 때 쓴다
 //  range-folders.json { folders: [{ id, name, parent }] }   (parent: 상위 폴더 id, 없으면 맨 위)
-const fs = require('fs');
 const path = require('path');
 const { app } = require('electron');
+const jsonfile = require('./jsonfile');
 
 const file = () => path.join(app.getPath('userData'), 'clips.json');
 const foldersFile = () => path.join(app.getPath('userData'), 'range-folders.json');
 let lib = null;
 let folders = null;
-let timer = null;
+// 다시 만들 수 없는 사용자 데이터라 바로 전 내용을 .bak 로 남긴다 (jsonfile.js)
+const libWriter = jsonfile.writer(file, () => lib, { backup: true });
+const folderWriter = jsonfile.writer(foldersFile, () => ({ folders }), { backup: true, delay: 0 });
 
 function load() {
   if (lib) return lib;
-  try {
-    lib = JSON.parse(fs.readFileSync(file(), 'utf8'));
-  } catch {
-    lib = {};
-  }
+  lib = jsonfile.readSync(file(), {});
   return lib;
 }
 
-function save() {
-  clearTimeout(timer);
-  timer = setTimeout(() => fs.writeFile(file(), JSON.stringify(lib), () => {}), 500);
-}
+const save = () => libWriter.save();
 
 const cleanTags = (tags) =>
   [...new Set((Array.isArray(tags) ? tags : []).map((t) => String(t).trim().replace(/^#/, '').slice(0, 30)).filter(Boolean))].slice(0, 20);
@@ -114,11 +109,7 @@ const library = () => Object.entries(load()).map(([key, v]) => ({ key, meta: v.m
 
 function getFolders() {
   if (folders) return folders;
-  try {
-    folders = JSON.parse(fs.readFileSync(foldersFile(), 'utf8')).folders || [];
-  } catch {
-    folders = [];
-  }
+  folders = jsonfile.readSync(foldersFile(), {}).folders || [];
   return folders;
 }
 
@@ -126,7 +117,7 @@ function setFolders(list) {
   folders = (Array.isArray(list) ? list : [])
     .filter((f) => f && f.id && typeof f.name === 'string')
     .map((f) => ({ id: String(f.id), name: f.name.trim().slice(0, 60) || '?', parent: f.parent ? String(f.parent) : null }));
-  fs.writeFile(foldersFile(), JSON.stringify({ folders }), () => {});
+  folderWriter.save();
   return folders;
 }
 

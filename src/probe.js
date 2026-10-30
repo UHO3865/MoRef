@@ -6,6 +6,7 @@ const { spawn } = require('child_process');
 const { app } = require('electron');
 const proxy = require('./proxy');
 const sources = require('./sources');
+const jsonfile = require('./jsonfile');
 
 const MAX_PARALLEL = 3;
 const TIMEOUT_MS = 20000;
@@ -18,19 +19,12 @@ let running = 0;
 
 function loadCache() {
   if (cache) return cache;
-  try {
-    cache = JSON.parse(fs.readFileSync(cacheFile(), 'utf8'));
-  } catch {
-    cache = {};
-  }
+  cache = jsonfile.readSync(cacheFile(), {});
   return cache;
 }
 
-let saveTimer = null;
-function saveCache() {
-  clearTimeout(saveTimer);
-  saveTimer = setTimeout(() => fs.writeFile(cacheFile(), JSON.stringify(cache), () => {}), 1000);
-}
+const cacheWriter = jsonfile.writer(cacheFile, () => cache, { delay: 1000, durable: false });
+const saveCache = () => cacheWriter.save();
 
 // 설정의 ffmpeg 경로 옆에 있는 ffprobe
 function ffprobePath() {

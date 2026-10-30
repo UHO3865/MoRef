@@ -4,6 +4,7 @@
 const fs = require('fs');
 const path = require('path');
 const { app } = require('electron');
+const jsonfile = require('./jsonfile');
 
 const wait = (ms) => new Promise((r) => setTimeout(r, ms));
 
@@ -30,6 +31,7 @@ async function run(win) {
     } catch (e) {
       log('FAILED', e.stack || e);
     }
+    jsonfile.flushAll();
     return app.exit(0);
   }
 
@@ -160,8 +162,9 @@ async function run(win) {
     log('loop check (a=0.5 b=1.5 @0.5x)', await js(`[...RB.app.items.values()].filter(i => i.kind === 'video').map(i => i.name).join(',')`), samples.join(' | '));
     await shot('4-loop');
 
+    // (시험 폴더에 '점프 01.mp4' 가 없으면 첫 영상으로)
     // 재생 UI 클로즈업: 한 영상에 맞추고 진행 바에 마우스 올리기 → 속도 목록 열기
-    await js(`(() => { const it = [...RB.app.items.values()].find(i => i.name === '점프 01.mp4'); RB.select(it, false); RB.fitView(); })()`);
+    await js(`(() => { const it = ([...RB.app.items.values()].find(i => i.name === '점프 01.mp4') || [...RB.app.items.values()].find(i => i.kind === 'video')); RB.select(it, false); RB.fitView(); })()`);
     await wait(400);
     const sr = JSON.parse(await js(`JSON.stringify([...RB.app.selected][0].ctlEl.querySelector('.scrub').getBoundingClientRect())`));
     win.webContents.sendInputEvent({ type: 'mouseMove', x: Math.round(sr.left + sr.width * 0.62), y: Math.round(sr.top + sr.height / 2) });
@@ -208,7 +211,7 @@ async function run(win) {
       await shot('11-went-to-item');
 
       // 영상 진행 바 30% 지점 우클릭 → A, 영상 화면 우클릭 → 현재 위치를 B
-      const it = `[...RB.app.items.values()].find(i => i.name === '점프 01.mp4')`;
+      const it = `([...RB.app.items.values()].find(i => i.name === '점프 01.mp4') || [...RB.app.items.values()].find(i => i.kind === 'video'))`;
       await js(`(() => { const it = ${it}; it.a = it.b = null; goToItem(it); })()`);
       await wait(700);
       await js(`(() => { const it = ${it}; it.media.pause(); it.media.currentTime = 4.2; })()`);
@@ -250,7 +253,7 @@ async function run(win) {
       const R = (expr) => js(`JSON.stringify((${expr}).getBoundingClientRect())`).then(JSON.parse);
 
       // 영상: 바가 항목 바로 아래에 있는지
-      const vid = `[...RB.app.items.values()].find(i => i.name === '점프 01.mp4')`;
+      const vid = `([...RB.app.items.values()].find(i => i.name === '점프 01.mp4') || [...RB.app.items.values()].find(i => i.kind === 'video'))`;
       await js(`goToItem(${vid})`);
       await wait(600);
       const ir = await R(`(${vid}).el`);
@@ -569,15 +572,15 @@ async function run(win) {
       await wait(150);
     };
     await key('D');
-    await js(`goToItem([...RB.app.items.values()].find(i => i.name === 'hevc_test.mp4')); RB.select(null, false);`);
+    await js(`goToItem(([...RB.app.items.values()].find(i => i.name === 'hevc_test.mp4') || [...RB.app.items.values()].find(i => i.kind === 'video'))); RB.select(null, false);`);
     await wait(700);
-    const r = JSON.parse(await js(`(() => { const it = [...RB.app.items.values()].find(i => i.name === 'hevc_test.mp4');
+    const r = JSON.parse(await js(`(() => { const it = ([...RB.app.items.values()].find(i => i.name === 'hevc_test.mp4') || [...RB.app.items.values()].find(i => i.kind === 'video'));
       const b = it.el.getBoundingClientRect(); return JSON.stringify({ x: b.left, y: b.top, w: b.width, h: b.height }); })()`));
     const P = (fx, fy) => [Math.round(r.x + r.w * fx), Math.round(r.y + r.h * fy)];
-    const shapesOf = () => js(`[...RB.app.items.values()].find(i => i.name === 'hevc_test.mp4').shapes.map(s => s.t).join(',')`);
+    const shapesOf = () => js(`([...RB.app.items.values()].find(i => i.name === 'hevc_test.mp4') || [...RB.app.items.values()].find(i => i.kind === 'video')).shapes.map(s => s.t).join(',')`);
     log('draw: mode after D', await js('RB.app.draw.on + " " + RB.app.draw.tool'));
     await drag(Array.from({ length: 12 }, (_, i) => P(0.15 + i * 0.03, 0.3 + Math.sin(i / 2) * 0.1))); // 펜
-    log('draw: after pen', await shapesOf(), await js(`(() => { const b = [...RB.app.items.values()].find(i => i.name === 'hevc_test.mp4').el.getBoundingClientRect(); return b.left + ',' + b.top; })()`), JSON.stringify(r));
+    log('draw: after pen', await shapesOf(), await js(`(() => { const b = ([...RB.app.items.values()].find(i => i.name === 'hevc_test.mp4') || [...RB.app.items.values()].find(i => i.kind === 'video')).el.getBoundingClientRect(); return b.left + ',' + b.top; })()`), JSON.stringify(r));
     await key('A');
     await drag([P(0.55, 0.75), P(0.65, 0.6), P(0.8, 0.4)]); // 화살표
     log('draw: after arrow', await shapesOf(), await js('RB.app.draw.tool'));
@@ -594,7 +597,7 @@ async function run(win) {
     await drag([P(0.27, 0.1), P(0.27, 0.5), P(0.27, 0.7)]); // 펜 선을 가로질러 지우기
     log('draw: after eraser', await shapesOf());
     // 영상 크기를 바꿔도 그림이 따라오는지 + 저장/복원
-    await js(`(() => { const it = [...RB.app.items.values()].find(i => i.name === 'hevc_test.mp4'); it.w *= 0.6; it.h *= 0.6; RB.fitView(); })()`);
+    await js(`(() => { const it = ([...RB.app.items.values()].find(i => i.name === 'hevc_test.mp4') || [...RB.app.items.values()].find(i => i.kind === 'video')); it.w *= 0.6; it.h *= 0.6; RB.fitView(); })()`);
     const drawn = await js('RB.serialize()');
     await js(`RB.loadBoard(${JSON.stringify(drawn)}, null)`);
     await wait(2500);
@@ -614,6 +617,7 @@ async function run(win) {
   } catch (e) {
     log('FAILED', e.stack || e);
   }
+  jsonfile.flushAll();
   app.exit(0);
 }
 

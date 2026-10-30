@@ -73,10 +73,10 @@ function readAll(stream) {
   });
 }
 
-async function fetchChunk(src, rel, start, end, size) {
+async function fetchChunk(src, rel, start, end, size, priority) {
   const last = Math.min(end, start + size - 1);
   const get = async () => {
-    const up = await sources.davRequest(src, 'GET', rel, { headers: { Range: `bytes=${start}-${Number.isFinite(last) ? last : ''}` } });
+    const up = await sources.davRequest(src, 'GET', rel, { headers: { Range: `bytes=${start}-${Number.isFinite(last) ? last : ''}` }, priority });
     return { status: up.statusCode, headers: up.headers, body: await readAll(up) };
   };
   try {
@@ -106,7 +106,8 @@ async function serveDav(req, res, src, rel) {
     let end = m && m[2] !== '' ? Number(m[2]) : Infinity;
     const browser = /Chrome\//.test(req.headers['user-agent'] || '');
     const size = browser ? CHUNK : CHUNK_FFMPEG;
-    const first = await fetchChunk(src, rel, start, end, size);
+    const priority = browser ? 'high' : 'low'; // 재생이 썸네일 / fps 읽기보다 먼저 (sources.js 의 차례)
+    const first = await fetchChunk(src, rel, start, end, size, priority);
     copy(first.headers);
     if (first.status === 200) {
       // NAS 가 범위를 무시하고 파일 전체를 보냈다 (작은 파일)
@@ -135,7 +136,7 @@ async function serveDav(req, res, src, rel) {
       if (!res.write(body)) await new Promise((r) => res.once('drain', r).once('close', r));
       pos += body.length;
       if (pos > end || closed) break;
-      const next = await fetchChunk(src, rel, pos, end, size);
+      const next = await fetchChunk(src, rel, pos, end, size, priority);
       if (next.status !== 206 || !next.body.length) throw new Error(tr('NAS 응답 {0}', next.status));
       body = next.body.subarray(0, end - pos + 1);
     }
