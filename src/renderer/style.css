@@ -1395,7 +1395,7 @@ body.drawing .ibar.top .close { display: none; }
 .item.micro.sel:hover .resize::after, .item.micro.resizing .resize::after { right: 2px; bottom: 2px; width: 6px; height: 6px; box-shadow: 0 0 0 1.5px var(--accent); }
 .item.micro.sel { box-shadow: 0 0 0 1.5px var(--accent), 0 2px 8px #0006; }
 /* 가장 좁은 재생 바: 재생 · 프레임 번호 · 구간 칩 */
-#ctlLayer .ctl.nano .speed, #ctlLayer .ctl.nano .mutebtn, #ctlLayer .ctl.nano .framesbtn { display: none; }
+#ctlLayer .ctl.nano .speed, #ctlLayer .ctl.nano .mutebtn, #ctlLayer .ctl.nano .framesbtn, #ctlLayer .ctl.nano .onionbtn { display: none; }
 #ctlLayer .ctl.nano { padding: 2px 4px 3px; }
 #ctlLayer .ctl.nano .scrub { margin: 0 2px; }
 /* 좁은 구간 썸네일 줄: 번호만 */
@@ -1472,3 +1472,15 @@ body.lib-mode .panel-head, body.lib-mode .panel-nav, body.lib-mode #filter, body
 .peek .nm { font-size: 11px; padding: 3px 8px; background: var(--bg2); color: var(--fg2); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
 .peek .err { padding: 28px 12px; font-size: 12px; color: var(--danger); text-align: center; background: var(--bg2); }
 .card.peeking { border-color: var(--accent); }
+
+/* 썸네일에 마우스를 올려 두면 예고편 (peek.js) */
+.card .th .trailer { position: absolute; inset: 0; pointer-events: none; }
+.card .th .trailer img { display: block; width: 100%; height: 100%; object-fit: contain; }
+.card .th .trailer img[src] { background: #000; }
+.card .th .trailer .tbar { position: absolute; left: 4px; right: 4px; bottom: 3px; display: flex; gap: 2px; height: 3px; }
+.card .th .trailer .tbar i { flex: 1; border-radius: 2px; background: #ffffff26; }
+.card .th .trailer .tbar i.ok { background: #ffffff66; }
+.card .th .trailer .tbar i.on { background: var(--accent); }
+
+/* 어니언 스킨 (onion.js): 영상 위, 그림(anno) 아래 */
+.vis > canvas.onion { pointer-events: none; }

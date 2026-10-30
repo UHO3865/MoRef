@@ -68,6 +68,7 @@ function applyVisual(it) {
   m.style.objectFit = grid ? 'contain' : 'fill';
   it.vis.style.transform = it.flipH || it.flipV ? `scale(${it.flipH ? -1 : 1}, ${it.flipV ? -1 : 1})` : '';
   it.vis.style.filter = it.gray ? 'grayscale(1)' : '';
+  syncOnionBox(it);
   updateViewBadges(it);
 }
 

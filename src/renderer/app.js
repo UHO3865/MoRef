@@ -94,6 +94,7 @@ const ICONS = {
   crop: '<path d="M6.5 2.5v15h15"/><path d="M2.5 6.5h15v15"/>',
   frames: '<rect x="3.5" y="3.5" width="7" height="7" rx="1.3"/><rect x="13.5" y="3.5" width="7" height="7" rx="1.3"/><rect x="3.5" y="13.5" width="7" height="7" rx="1.3"/><rect x="13.5" y="13.5" width="7" height="7" rx="1.3"/>',
   folder: '<path d="M3.5 7.5a2 2 0 0 1 2-2h3.6l2 2.2h7.4a2 2 0 0 1 2 2v7.8a2 2 0 0 1-2 2h-13a2 2 0 0 1-2-2z"/>',
+  onion: '<circle cx="7.5" cy="12" r="4.5" opacity=".4"/><circle cx="12" cy="12" r="4.5" opacity=".7"/><circle cx="16.5" cy="12" r="4.5"/>',
   image: '<rect x="3.5" y="5" width="17" height="14" rx="2"/><circle cx="9" cy="10" r="1.6"/><path d="M20.5 15.5 15 10l-8 9"/>',
   target: '<circle cx="12" cy="12" r="7.5"/><circle cx="12" cy="12" r="2.5" fill="currentColor" stroke="none"/><path d="M12 1.8v3M12 19.2v3M1.8 12h3M19.2 12h3"/>',
   plus: '<path d="M12 5v14M5 12h14"/>',
@@ -1017,6 +1018,7 @@ async function addItem(opts) {
     it.y -= it.h / 2;
   }
   buildItemEl(it);
+  if (opts.onion) setOnion(it, opts.onion);
   app.items.set(it.id, it);
   boardChanged(it, 1);
   layoutAll();
@@ -1336,6 +1338,7 @@ function buildControls(it) {
     changeSpeed(it, e.deltaY < 0 ? 1 : -1);
   };
   row.append(c.speed);
+  c.onion = btn('onion', tr('어니언 스킨 - 멈췄을 때 앞뒤 프레임 겹쳐 보기 (K)'), () => toggleOnion(it), 'onionbtn');
   c.sync = btn('link', '', () => toggleSync(it), 'sync'); // Blender 와 연결됐을 때만 보인다 (CSS)
   if (it.kind === 'gif') c.frames = btn('frames', tr('모든 프레임 보기 (G) - 프레임을 누르면 그 프레임으로'), () => toggleFrames(it), 'framesbtn');
   else c.mute = btn('mute', tr('소리 켜기 / 끄기 (M)'), () => toggleMute(it), 'mutebtn');
@@ -1459,6 +1462,7 @@ function removeItem(it) {
     it.media.destroy();
   }
   clearTimeout(it.hoverTimer);
+  closeOnion(it);
   releaseMedia(it);
   if (app.cropping === it) app.cropping = null;
   it.ctlEl?.remove();
@@ -1503,6 +1507,7 @@ function tick() {
     if (!isTimed(it)) continue;
     const v = it.media;
     const d = durOf(it);
+    if (it.onion) onionTick(it);
     // 연속 seek 중 멈춰 버리는 경우(webm 등)가 있어, 오래 걸리면 seek 을 다시 건다.
     // 처음 받는 중(첫 프레임 전)에는 걸지 않고, 다시 걸 때마다 기다리는 시간을 두 배로: 여러 영상을 동시에
     // 처음부터 받으며 이동하면 몇 초씩 걸리는데, 그때 다시 걸면 끝나지 못하고 계속 처음부터 이동한다.
@@ -1695,6 +1700,10 @@ function itemMenu(ev, it) {
     items.push({ label: v.paused ? tr('재생') : tr('일시정지'), icon: v.paused ? 'play' : 'pause', hint: 'Space', action: () => togglePlay(it) });
     if (it.kind === 'gif') items.push({ label: v.grid ? tr('모든 프레임 보기 끄기') : tr('모든 프레임 보기'), icon: 'frames', hint: 'G', action: () => toggleFrames(it) });
     else items.push({ label: it.muted ? tr('소리 켜기') : tr('소리 끄기'), icon: it.muted ? 'vol' : 'mute', hint: 'M', action: () => toggleMute(it) });
+    items.push({ label: tr('어니언 스킨 (앞뒤 프레임 겹쳐 보기)'), icon: 'onion', hint: 'K', checked: !!it.onion, action: () => toggleOnion(it) });
+    if (it.onion) {
+      for (const n of ONION_COUNTS) items.push({ label: tr('앞뒤 {0}프레임', n), checked: it.onion === n, action: () => setOnion(it, n) });
+    }
     items.push('sep');
   }
   if (app.linked && isTimed(it)) {
@@ -2217,6 +2226,7 @@ function serialize() {
       a: it.a,
       b: it.b,
       muted: it.muted,
+      onion: it.onion || undefined,
       t: isTimed(it) ? (it.unloaded ? it.savedT : it.media.currentTime) : 0,
       paused: isTimed(it) ? !it.autoPaused && it.media.paused : false,
       shapes: it.shapes,
@@ -2486,6 +2496,7 @@ function initKeys() {
         each((it) => it.segments?.[Number(e.key) - 1] && activateSegment(it, it.segments[Number(e.key) - 1].id));
         break;
       case 'g': case 'G': each(toggleFrames); break;
+      case 'k': case 'K': each(toggleOnion); break;
       case 'f': case 'F': fitView(); break;
       case 'd': case 'D': setDrawMode(!app.draw.on); break;
       case 'h': case 'H': toggleDrawHidden(); break;
