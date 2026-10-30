@@ -94,6 +94,9 @@ const ICONS = {
   crop: '<path d="M6.5 2.5v15h15"/><path d="M2.5 6.5h15v15"/>',
   frames: '<rect x="3.5" y="3.5" width="7" height="7" rx="1.3"/><rect x="13.5" y="3.5" width="7" height="7" rx="1.3"/><rect x="3.5" y="13.5" width="7" height="7" rx="1.3"/><rect x="13.5" y="13.5" width="7" height="7" rx="1.3"/>',
   folder: '<path d="M3.5 7.5a2 2 0 0 1 2-2h3.6l2 2.2h7.4a2 2 0 0 1 2 2v7.8a2 2 0 0 1-2 2h-13a2 2 0 0 1-2-2z"/>',
+  perFrame: '<rect x="3.5" y="5" width="17" height="14" rx="2"/><path d="M3.5 9h17M3.5 15h17M8 5v4M16 5v4M8 15v4M16 15v4"/><path d="M10 12.5l1.6-1.6 2.4 2.4" stroke-width="1.6"/>',
+  bgShown: '<rect x="3.5" y="5" width="17" height="14" rx="2"/><path d="M7 15.5c2-4 3.5 1 5.5-2.5s3-2 4.5-3"/>',
+  bgHidden: '<rect x="3.5" y="5" width="17" height="14" rx="2" stroke-dasharray="2.6 2.4"/><path d="M7 15.5c2-4 3.5 1 5.5-2.5s3-2 4.5-3"/>',
   onion: '<circle cx="7.5" cy="12" r="4.5" opacity=".4"/><circle cx="12" cy="12" r="4.5" opacity=".7"/><circle cx="16.5" cy="12" r="4.5"/>',
   image: '<rect x="3.5" y="5" width="17" height="14" rx="2"/><circle cx="9" cy="10" r="1.6"/><path d="M20.5 15.5 15 10l-8 9"/>',
   target: '<circle cx="12" cy="12" r="7.5"/><circle cx="12" cy="12" r="2.5" fill="currentColor" stroke="none"/><path d="M12 1.8v3M12 19.2v3M1.8 12h3M19.2 12h3"/>',
@@ -1008,6 +1011,7 @@ async function addItem(opts) {
     flipH: !!opts.flipH,
     flipV: !!opts.flipV,
     gray: !!opts.gray,
+    hideMedia: !!opts.hideMedia, // 영상을 숨기고 그림만 (framedraw.js)
     crop: opts.crop || null,
     sync: opts.sync || null, // Blender 타임라인 기준점 { b0, t0 }
   };
@@ -1150,7 +1154,9 @@ function buildItemEl(it) {
   const top = h('div', 'ibar top');
   top.append(h('span', 'nm', it.name));
   it.badges = h('span', 'vbadges');
-  top.append(it.badges);
+  it.frameBadge = h('span', 'fbadge'); // 프레임별 그리기 중 지금 프레임 (framedraw.js)
+  it.frameBadge.hidden = true;
+  top.append(it.badges, it.frameBadge);
   const close = h('button', 'close');
   close.innerHTML = icon('x');
   close.title = tr('닫기 (Delete)');
@@ -1547,6 +1553,7 @@ function select(it, additive) {
     if (it.ctlEl) it.ctlEl.style.zIndex = it.z;
     refreshCtl(it);
   }
+  if (app.draw.on) updateDrawExtrasUi(); // 배경 버튼은 고른 영상의 상태를 보여 준다
 }
 
 // 반복 구간 / 진행 바 갱신.
@@ -1579,6 +1586,8 @@ function tick() {
     const d = durOf(it);
     if (!v.paused || v.seeking || it.pendingSeek != null) busy = true;
     if (it.onion) onionTick(it);
+    if (it.shapeFrame != null) frameShapesTick(it);
+    if (app.draw.on) updateFrameBadge(it);
     // 연속 seek 중 멈춰 버리는 경우(webm 등)가 있어, 오래 걸리면 seek 을 다시 건다.
     // 처음 받는 중(첫 프레임 전)에는 걸지 않고, 다시 걸 때마다 기다리는 시간을 두 배로: 여러 영상을 동시에
     // 처음부터 받으며 이동하면 몇 초씩 걸리는데, 그때 다시 걸면 끝나지 못하고 계속 처음부터 이동한다.
@@ -1792,6 +1801,7 @@ function itemMenu(ev, it) {
   items.push({ label: tr('좌우 반전'), icon: 'mirror', hint: 'Shift+H', checked: it.flipH, action: () => toggleFlip(it, 'flipH') });
   items.push({ label: tr('상하 반전'), icon: 'flipV', hint: 'Shift+V', checked: it.flipV, action: () => toggleFlip(it, 'flipV') });
   items.push({ label: tr('흑백'), icon: 'gray', hint: 'Shift+G', checked: it.gray, action: () => toggleGray(it) });
+  items.push({ label: tr('영상 숨기기 (그림만 보기)'), icon: 'bgHidden', hint: 'B', checked: !!it.hideMedia, action: () => toggleHideMedia(it) });
   items.push({ label: tr('자르기…'), icon: 'crop', hint: 'C', action: () => startCrop(it) });
   if (it.crop) items.push({ label: tr('자르기 해제'), icon: 'undo', action: () => resetCrop(it) });
   items.push('sep');
@@ -2027,8 +2037,10 @@ function shapeEl(s) {
   return svgEl('path', { ...common, d: `M${a.join(' ')}L${b.join(' ')}M${l.join(' ')}L${b.join(' ')}L${r.join(' ')}` });
 }
 
+// 프레임별로 그린 것은 그 프레임에서만, 어니언이 켜져 있으면 앞뒤 프레임 것도 옅게 (framedraw.js)
 function renderShapes(it) {
-  it.svg.replaceChildren(...it.shapes.map(shapeEl));
+  it.svg.replaceChildren(...shapeNodes(it));
+  updateFrameBadge(it);
 }
 
 // 지우개 판정용: 도형을 꺾은선으로 근사
@@ -2095,6 +2107,16 @@ function startStroke(ev, it) {
   const el = it.el;
   el.setPointerCapture(ev.pointerId);
   const { tool, color } = app.draw;
+  if (!app.selected.has(it)) select(it, false); // ← → 로 이 영상의 프레임을 옮길 수 있게
+  // 프레임별 그리기: 멈추고 그 프레임에 그린다
+  const perFrame = app.draw.perFrame && isTimed(it);
+  if (perFrame && !it.media.paused) it.media.pause();
+  const cur = perFrame ? currentFrame(it) : shapeFrameOf(it);
+  it.stroking = true;
+  const end = () => {
+    el.onpointermove = el.onpointerup = null;
+    it.stroking = false;
+  };
 
   if (tool === 'eraser') {
     const tol = 6 / rect.width;
@@ -2110,19 +2132,21 @@ function startStroke(ev, it) {
       ]);
       prev = p;
       const n = it.shapes.length;
-      it.shapes = it.shapes.filter((s) => !probes.some((q) => hitShape(s, q, tol)));
+      // 지금 보이는 것만 지운다 (다른 프레임의 그림 · 옅게 보이는 앞뒤 프레임 그림은 그대로)
+      it.shapes = it.shapes.filter((s) => !(shapeVisible(s, cur) && probes.some((q) => hitShape(s, q, tol))));
       if (it.shapes.length !== n) renderShapes(it);
     };
     erase(ev);
     el.onpointermove = erase;
     el.onpointerup = () => {
-      el.onpointermove = el.onpointerup = null;
+      end();
       if (it.shapes.length !== before.length) pushUndo([{ it, before, after: structuredClone(it.shapes) }]);
     };
     return;
   }
 
   const shape = { t: tool, c: color, w: round4(app.draw.width / rect.width), p: [toLocal(ev)] };
+  if (perFrame) shape.f = cur;
   it.shapes.push(shape);
   let node = shapeEl(shape);
   it.svg.append(node);
@@ -2141,7 +2165,7 @@ function startStroke(ev, it) {
     node = next;
   };
   el.onpointerup = () => {
-    el.onpointermove = el.onpointerup = null;
+    end();
     // 화살표/원은 거의 안 끌었으면 버린다
     const [a, b] = [shape.p[0], shape.p[shape.p.length - 1]];
     if (tool !== 'pen' && Math.hypot(b[0] - a[0], b[1] - a[1]) < 4 / rect.width) {
@@ -2149,23 +2173,29 @@ function startStroke(ev, it) {
       node.remove();
       return;
     }
+    if (perFrame) renderShapes(it); // 이제 프레임별 그림이 있다: 프레임을 따라 바꿔 그리기 시작
     pushUndo([{ it, before, after: structuredClone(it.shapes) }]);
   };
 }
 
+// 프레임별 그리기 중이면 지금 프레임의 그림만, 아니면 전부
 function clearDrawings() {
-  const targets = (app.selected.size ? [...app.selected] : [...app.items.values()]).filter((it) => it.shapes.length);
+  const perFrame = app.draw.perFrame;
+  const keep = (it) => (perFrame && isTimed(it) ? ((f) => it.shapes.filter((s) => s.f !== f))(currentFrame(it)) : []);
+  const targets = (app.selected.size ? [...app.selected] : [...app.items.values()]).filter((it) => keep(it).length !== it.shapes.length);
   if (!targets.length) return;
-  const action = targets.map((it) => ({ it, before: structuredClone(it.shapes), after: [] }));
+  const action = targets.map((it) => ({ it, before: structuredClone(it.shapes), after: keep(it) }));
   applyShapes(action, 'after');
   pushUndo(action);
-  toast(tr('그림을 지웠습니다 (Ctrl+Z 로 되돌리기)'));
+  toast(perFrame ? tr('이 프레임의 그림을 지웠습니다 (Ctrl+Z 로 되돌리기)') : tr('그림을 지웠습니다 (Ctrl+Z 로 되돌리기)'));
 }
 
 function setDrawMode(on) {
   app.draw.on = on;
   document.body.classList.toggle('drawing', on);
   $('#btnDraw').classList.toggle('on', on);
+  updateDrawExtrasUi();
+  for (const it of app.items.values()) updateFrameBadge(it);
   if (on) {
     if (document.body.classList.contains('draw-hidden')) toggleDrawHidden(false);
     // 저장된 위치는 툴바가 보인 뒤에야 크기를 알 수 있어 이때 적용
@@ -2180,7 +2210,7 @@ function setTool(tool) {
   app.draw.tool = tool;
   for (const b of document.querySelectorAll('#drawBar [data-tool]')) b.classList.toggle('on', b.dataset.tool === tool);
   document.body.classList.toggle('tool-eraser', tool === 'eraser');
-  rb.setSetting('draw', { tool, color: app.draw.color, width: app.draw.width });
+  rb.setSetting('draw', { tool, color: app.draw.color, width: app.draw.width, perFrame: !!app.draw.perFrame });
 }
 
 function setColor(color) {
@@ -2234,6 +2264,9 @@ function initDraw() {
   $('#btnRedo').onclick = redo;
   $('#btnClearDraw').onclick = clearDrawings;
   $('#btnHideDraw').onclick = () => toggleDrawHidden();
+  $('#btnPerFrame').onclick = () => togglePerFrame();
+  $('#btnBg').onclick = cycleBackground;
+  app.draw.perFrame = !!saved.perFrame;
   $('#btnDrawDone').onclick = () => setDrawMode(false);
   $('#btnDraw').onclick = () => setDrawMode(!app.draw.on);
   const bar = $('#drawBar');
@@ -2270,6 +2303,7 @@ function initDraw() {
   setColor(app.draw.color);
   setWidth(app.draw.width);
   setTool(saved.tool || 'pen');
+  updateDrawExtrasUi();
 }
 
 /* =====================================================================
@@ -2301,6 +2335,7 @@ function serialize() {
       b: it.b,
       muted: it.muted,
       onion: it.onion || undefined,
+      hideMedia: it.hideMedia || undefined,
       t: isTimed(it) ? (it.unloaded ? it.savedT : it.media.currentTime) : 0,
       paused: isTimed(it) ? !it.autoPaused && it.media.paused : false,
       shapes: it.shapes,
@@ -2585,6 +2620,7 @@ function initKeys() {
         break;
       case 'g': case 'G': each(toggleFrames); break;
       case 'k': case 'K': each(toggleOnion); break;
+      case 'b': case 'B': each(toggleHideMedia); updateDrawExtrasUi(); break;
       case 'f': case 'F': fitView(); break;
       case 'd': case 'D': setDrawMode(!app.draw.on); break;
       case 'h': case 'H': toggleDrawHidden(); break;

@@ -1,5 +1,5 @@
 'use strict';
-/* global app, rb, h, tr, toast, isTimed, fpsOf, currentFrame, totalFrames, markDirty, ensureLoaded, closeMenus, refreshCtl */
+/* global app, rb, h, tr, toast, isTimed, fpsOf, currentFrame, totalFrames, markDirty, renderShapes, ensureLoaded, closeMenus, refreshCtl */
 // 어니언 스킨: 멈춰 있을 때 앞뒤 프레임을 색을 입혀 겹쳐 보여 준다 (Blender 의 어니언 스킨처럼)
 //  * 지금 프레임과 달라진 곳만 칠한다: 움직인 부분이 어디서 와서 어디로 가는지 보이고, 가만히 있는 배경은 그대로
 //  * 이전 프레임은 초록, 다음 프레임은 파랑. 지금 프레임에서 멀수록 옅게
@@ -41,6 +41,7 @@ function setOnion(it, v, { remember = true } = {}) {
   it.ctl?.onion?.classList.toggle('on', !!it.onion);
   updateOnionMenu(it);
   markDirty();
+  renderShapes(it); // 프레임별 그림의 앞뒤도 같은 수만큼 (framedraw.js)
   if (!it.onion) return closeOnion(it);
   if (remember) {
     app.settings.onionDefault = it.onion;

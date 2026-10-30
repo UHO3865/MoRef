@@ -17,12 +17,18 @@ async function run(win) {
       console.log('[selftest] JS FAILED:', code.replace(/\s+/g, ' ').slice(0, 220));
       throw e;
     });
+  // 스크린샷이 실패해도(드물게 GPU 쪽 오류) 점검은 이어간다 - 화면 픽셀로 확인하는 단계가 따로 있다
   const shot = async (name) => {
-    const img = await win.webContents.capturePage();
-    fs.writeFileSync(path.join(out, name + '.png'), img.toPNG());
+    try {
+      const img = await win.webContents.capturePage();
+      fs.writeFileSync(path.join(out, name + '.png'), img.toPNG());
+    } catch (e) {
+      console.log('[selftest] screenshot failed', name, e.message);
+    }
   };
   const log = (...a) => console.log('[selftest]', ...a);
   win.webContents.on('console-message', (e) => log('console:', e.message));
+  win.on('minimize', () => log('window minimized (화면 캡처가 실패한다)'));
 
   // RB_TEST_SCRIPT=<파일>: 전체 점검 대신 그 파일의 시나리오만 실행 (module.exports = async ({ win, js, shot, log, wait }) => …)
   if (process.env.RB_TEST_SCRIPT) {
@@ -330,7 +336,10 @@ async function run(win) {
       };
       const shownFrame = async (expr) => {
         const r = JSON.parse(await js(`JSON.stringify((${expr}).el.getBoundingClientRect())`));
-        const img = await win.webContents.capturePage({ x: Math.round(r.left + r.width * 0.25) - 2, y: Math.round(r.top + r.height * 0.6) - 2, width: 4, height: 4 });
+        const area = { x: Math.round(r.left + r.width * 0.25) - 2, y: Math.round(r.top + r.height * 0.6) - 2, width: 4, height: 4 };
+        const img = await win.webContents.capturePage(area).catch((e) => {
+          throw new Error(`${e.message} capturing ${JSON.stringify(area)} of ${JSON.stringify(r)} in ${JSON.stringify(win.getContentBounds())}`);
+        });
         const px = img.toBitmap(); // BGRA
         return Math.round(px[1] / 8.15); // 회색이라 G 만 봐도 된다
       };
@@ -658,6 +667,19 @@ async function run(win) {
     log('draw: after reload', await shapesOf());
     await key('Escape');
     log('draw: mode after Esc', await js('RB.app.draw.on'));
+    // 프레임별 그림: 그 프레임에서만 보이고, 배경을 숨겨도 그림은 보인다
+    {
+      const FV = `([...RB.app.items.values()].find(i => i.kind === 'video'))`;
+      const shown = () => js(`[...(${FV}).svg.children].filter((n) => !n.classList.contains('ghost') && n.getAttribute('stroke') === '#ff00aa').length`);
+      await js(`(() => { const it = ${FV}; it.media.pause(); seekFrame(it, 10); return 1; })()`);
+      await wait(900);
+      await js(`(() => { const it = ${FV}; it.shapes.push({ t: 'pen', c: '#ff00aa', w: 0.01, p: [[0.1, 0.1], [0.3, 0.2]], f: 10 }); renderShapes(it); setBackground(it, 'hidden'); return 1; })()`);
+      const at10 = await shown();
+      await js(`seekFrame(${FV}, 11)`);
+      await wait(900);
+      log('frame draw: shown at f10', at10, '| at f11', await shown(), '| video hidden', await js(`(${FV}).vis.style.opacity === '0'`));
+      await js(`(() => { const it = ${FV}; it.shapes = it.shapes.filter((s) => s.c !== '#ff00aa'); setBackground(it, 'normal'); renderShapes(it); return 1; })()`);
+    }
     await shot('9-drawn-reloaded');
 
     await js(`rb.setSetting('opacity', 0.6); rb.setSetting('alwaysOnTop', true)`);

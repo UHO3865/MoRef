@@ -1502,3 +1502,11 @@ body.lib-mode .panel-head, body.lib-mode .panel-nav, body.lib-mode #filter, body
 .ctl .onion-menu .om-off { margin-top: 4px; text-align: center; color: var(--fg2); }
 /* 어니언 스킨의 옆 프레임을 읽는 숨은 영상: 문서 안에 있어야 프레임 시점을 받는다 (display:none 이면 안 됨) */
 .onion-helper { position: fixed; left: 0; top: 0; width: 2px; height: 2px; opacity: 0; pointer-events: none; z-index: -1; }
+
+/* 영상 숨김 (그림만 보기 - framedraw.js): 바탕을 비우고 테두리만 옅게 */
+.item.media-hidden { background: transparent; box-shadow: none; outline: 1px dashed #ffffff2e; outline-offset: -1px; }
+.item.media-hidden.sel { outline-color: var(--accent); }
+/* 프레임별 그리기 중: 지금 프레임 */
+.ibar.top .fbadge { margin-left: 6px; padding: 1px 7px; border-radius: 999px; background: var(--accent); color: #fff; font-size: 11px; font-variant-numeric: tabular-nums; white-space: nowrap; }
+.ibar.top .fbadge[hidden] { display: none; }
+.draw-bar #btnPerFrame.on, .draw-bar #btnBg.on { background: #4ea1ff2e; color: var(--accent); box-shadow: inset 0 0 0 1px #4ea1ff80; }

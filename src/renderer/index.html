@@ -97,6 +97,11 @@
         </label>
         <span class="dsep"></span>
         <div class="dgroup">
+          <button id="btnPerFrame" data-icon="perFrame" title="프레임별 그리기 - 켜면 지금 프레임에만 보이게 그립니다 (← → 로 프레임 이동)"></button>
+          <button id="btnBg" data-icon="bgShown" title="배경: 그대로 / 흑백 / 숨김 (B)"></button>
+        </div>
+        <span class="dsep"></span>
+        <div class="dgroup">
           <button id="btnUndo" data-icon="undo" title="되돌리기 (Ctrl+Z)"></button>
           <button id="btnRedo" data-icon="redo" title="다시 하기 (Ctrl+Y)"></button>
           <button id="btnHideDraw" data-icon="eye" title="그림 숨기기 / 보이기 (H)"></button>
@@ -193,6 +198,7 @@
         <tr><td>K</td><td>어니언 스킨 켜기 / 끄기 (이전 · 다음 프레임 수는 컨트롤 바의 어니언 버튼)</td></tr>
         <tr><td>Shift+H / Shift+V</td><td>좌우 반전 / 상하 반전</td></tr>
         <tr><td>Shift+G</td><td>흑백</td></tr>
+        <tr><td>B</td><td>영상 숨기기 (그림만 보기)</td></tr>
         <tr><td>C</td><td>자르기 (Enter 적용 · Esc 취소)</td></tr>
         <tr><td>L</td><td>Blender 타임라인에 맞추기 (Blender 와 연결됐을 때)</td></tr>
         <tr><td>Delete</td><td>보드에서 닫기</td></tr>
@@ -220,6 +226,7 @@
   <script src="media.js"></script>
   <script src="peek.js"></script>
   <script src="onion.js"></script>
+  <script src="framedraw.js"></script>
   <script src="app.js"></script>
 </body>
 </html>
