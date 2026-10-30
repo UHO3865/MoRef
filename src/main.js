@@ -65,6 +65,16 @@ function createWindow() {
       backgroundThrottling: false,
     },
   });
+  // 소스 폴더에서 켠 창을 작업 표시줄에 고정하면 Windows 는 electron.exe 만 고정한다 (Electron 아이콘, 누르면 빈 Electron).
+  // 다시 열 명령과 아이콘을 창에 적어 두면 고정한 아이콘이 MoRef 로 이 폴더를 연다
+  if (process.platform === 'win32' && !app.isPackaged) {
+    win.setAppDetails({
+      appId: APP_ID,
+      appIconPath: path.join(__dirname, '..', 'assets', 'icon.ico'),
+      relaunchCommand: `"${process.execPath}" "${app.getAppPath()}"`,
+      relaunchDisplayName: 'MoRef',
+    });
+  }
   win.setOpacity(settings.opacity || 1);
   i18n.setLang(i18n.resolveLang(settings));
   loadUi();
@@ -219,8 +229,11 @@ function registerIpc() {
 // 끌 때: 모아 두었다가 쓰려던 구간 / 폴더 / fps 캐시를 마저 쓴다
 app.on('will-quit', () => jsonfile.flushAll());
 
-// 작업 표시줄에서 electron.exe 가 아니라 MoRef 로 묶이게
-app.setAppUserModelId('MoRef');
+// 작업 표시줄에서 electron.exe 가 아니라 MoRef 로 묶이게.
+// 설치판은 설치 프로그램이 바로 가기에 붙이는 ID(package.json 의 appId)와 같아야 고정한 아이콘과 켜진 창이 하나로 묶인다.
+// 소스 폴더에서 켠 것은 따로 묶는다 (설치판 아이콘 아래로 들어가지 않게)
+const APP_ID = app.isPackaged ? 'com.refboard.app' : 'com.refboard.app.source';
+app.setAppUserModelId(APP_ID);
 
 // 하나만 띄운다: 이미 켜져 있으면 (바로 가기 / Blender 의 MoRef 열기) 그 창을 앞으로 가져오고 끝낸다
 const firstInstance = SELFTEST || app.requestSingleInstanceLock();
