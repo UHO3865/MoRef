@@ -1111,6 +1111,7 @@ function buildItemEl(it) {
       showError(it, code === 4 ? tr('재생할 수 없는 형식/코덱입니다') : tr('NAS에서 영상을 읽지 못했습니다 (연결 확인)'));
     };
     v.onplay = v.onpause = () => updatePlayBtn(it);
+    for (const ev of ['seeking', 'seeked', 'loadeddata', 'durationchange', 'progress', 'ratechange']) v.addEventListener(ev, wakeTick);
     v.addEventListener('loadstart', () => (it.hasFrame = false));
     v.addEventListener('loadeddata', () => (it.hasFrame = true));
     it.media = v;
@@ -1370,6 +1371,7 @@ function updateFpsUi(it) {
 }
 
 function updatePlayBtn(it) {
+  wakeTick(); // 재생 / 멈춤 (영상 · GIF)
   if (!it.ctl) return;
   const paused = it.media.paused;
   it.ctl.play.innerHTML = icon(paused ? 'play' : 'pause');
@@ -1500,13 +1502,35 @@ function select(it, additive) {
   }
 }
 
-// 반복 구간 / 진행 바 갱신
+// 반복 구간 / 진행 바 갱신.
+// 무언가 움직이는 동안(재생 · 이동 중)만 매 화면 돈다. 모두 멈춰 있으면 1초에 4번만 (대기 중에 CPU / GPU 를 쓰지 않게).
+// 재생 · 이동 · 입력이 생기면 wakeTick() 으로 바로 다시 매 화면으로
+const TICK_IDLE_MS = 250;
+let tickRaf = 0;
+let tickTimer = 0;
+function wakeTick() {
+  if (tickRaf) return;
+  clearTimeout(tickTimer);
+  tickTimer = 0;
+  tickRaf = requestAnimationFrame(tick);
+}
+// 값이 바뀔 때만 쓴다 (같은 값을 매 화면 써도 스타일 계산이 다시 돈다)
+function setStyle(el, k, v) {
+  const c = (el._st ??= {});
+  if (c[k] === v) return;
+  c[k] = v;
+  el.style[k] = v;
+}
+
 function tick() {
+  tickRaf = 0;
+  let busy = false;
   updateBlenderRange();
   for (const it of app.items.values()) {
     if (!isTimed(it)) continue;
     const v = it.media;
     const d = durOf(it);
+    if (!v.paused || v.seeking || it.pendingSeek != null) busy = true;
     if (it.onion) onionTick(it);
     // 연속 seek 중 멈춰 버리는 경우(webm 등)가 있어, 오래 걸리면 seek 을 다시 건다.
     // 처음 받는 중(첫 프레임 전)에는 걸지 않고, 다시 걸 때마다 기다리는 시간을 두 배로: 여러 영상을 동시에
@@ -1531,8 +1555,8 @@ function tick() {
     const c = it.ctl;
     const pct = (x) => (x / d) * 100 + '%';
     const t = v.currentTime;
-    c.fill.style.width = pct(t);
-    c.knob.style.left = pct(t);
+    setStyle(c.fill, 'width', pct(t));
+    setStyle(c.knob, 'left', pct(t));
     const cur = fmtTime(t);
     if (c.cur.textContent !== cur) c.cur.textContent = cur;
     const total = ' / ' + fmtTime(d);
@@ -1553,9 +1577,14 @@ function tick() {
     for (let i = 0; i < v.buffered.length; i++) {
       if (v.buffered.start(i) <= t + 0.1) bufEnd = Math.max(bufEnd, v.buffered.end(i));
     }
-    c.buf.style.width = pct(bufEnd);
+    setStyle(c.buf, 'width', pct(bufEnd));
   }
-  requestAnimationFrame(tick);
+  if (tickRaf) return; // 도는 중에 wakeTick() 이 이미 다음 화면을 잡았다 (두 줄로 돌지 않게)
+  if (busy) tickRaf = requestAnimationFrame(tick);
+  else {
+    clearTimeout(tickTimer);
+    tickTimer = setTimeout(wakeTick, TICK_IDLE_MS);
+  }
 }
 
 // ---------- 우클릭 메뉴 ----------
@@ -2394,9 +2423,10 @@ function initSettings() {
     rb.setSetting('ffmpegPath', app.settings.ffmpegPath);
   };
   $('#btnClearThumbs').onclick = async () => {
-    await rb.thumb.clear();
-    toast(tr('썸네일 캐시를 비웠습니다'));
+    const freed = await rb.thumb.clear();
+    toast(tr('캐시를 비웠습니다 ({0})', fmtSize(freed) || `${Math.round((freed || 0) / 1e6)}MB`));
     thumbDone.clear();
+    thumbUrls.clear(); // 구간 · 예고편 썸네일 주소 (segthumbs.js)
     renderGrid();
   };
   for (const m of document.querySelectorAll('.modal')) {
@@ -2542,7 +2572,9 @@ async function main() {
   initPeek();
   initMediaSaver();
   initKeys();
-  requestAnimationFrame(tick);
+  // 입력이 있으면 진행 바 / 프레임 번호를 바로 따라가게 (GIF 이동 · 진행 바 끌기는 미디어 이벤트가 없다)
+  for (const ev of ['pointerdown', 'pointermove', 'wheel', 'keydown']) window.addEventListener(ev, wakeTick, { capture: true, passive: true });
+  wakeTick();
 
   await loadClipLib();
   const last = st.lastFolder;

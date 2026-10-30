@@ -129,7 +129,11 @@ async function localFileFor(ref, onProgress) {
   if (head.statusCode !== 200) throw new Error(tr('NAS 응답 {0}', head.statusCode));
   const total = Number(head.headers['content-length']) || 0;
   const have = await fs.promises.stat(out).catch(() => null);
-  if (have && total && have.size === total) return out;
+  if (have && total && have.size === total) {
+    const now = new Date();
+    fs.promises.utimes(out, now, now).catch(() => {}); // 최근에 쓴 것으로 (caches.js 가 오래된 것부터 지운다)
+    return out;
+  }
   await fs.promises.mkdir(dir, { recursive: true });
   const tmp = out + '.part';
   try {

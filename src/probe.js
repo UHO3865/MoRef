@@ -17,10 +17,22 @@ const pending = new Map();
 const queue = [];
 let running = 0;
 
+const MAX_ENTRIES = 5000; // 넘으면 오래 전에 넣은 것부터 버린다 (영상 하나에 100바이트쯤)
+
 function loadCache() {
   if (cache) return cache;
   cache = jsonfile.readSync(cacheFile(), {});
+  const keys = Object.keys(cache);
+  if (keys.length > MAX_ENTRIES) {
+    for (const k of keys.slice(0, keys.length - MAX_ENTRIES * 0.8)) delete cache[k];
+    saveCache();
+  }
   return cache;
+}
+
+function clearCache() {
+  cache = {};
+  saveCache();
 }
 
 const cacheWriter = jsonfile.writer(cacheFile, () => cache, { delay: 1000, durable: false });
@@ -132,4 +144,4 @@ async function probe(ref) {
   return p;
 }
 
-module.exports = { probe };
+module.exports = { probe, clearCache };
