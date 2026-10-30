@@ -1397,3 +1397,6 @@ body.lib-mode .panel-head, body.lib-mode .panel-nav, body.lib-mode #filter, body
 .ask-input { background: var(--bg3); color: var(--fg); border: 1px solid #ffffff24; border-radius: 6px; padding: 7px 9px; }
 .ask-sug { display: flex; flex-wrap: wrap; gap: 4px; max-height: 110px; overflow-y: auto; }
 .ask-row { display: flex; justify-content: flex-end; gap: 6px; }
+.ask-msg { line-height: 1.5; overflow-wrap: anywhere; }
+.btn.primary.danger { background: var(--danger); border-color: var(--danger); color: #fff; }
+.btn.primary.danger:hover { filter: brightness(1.1); color: #fff; }

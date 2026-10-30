@@ -2357,7 +2357,7 @@ function initSettings() {
     toast(tr('소스 저장됨'));
   };
   $('#btnDelSrc').onclick = async () => {
-    if (!editingId || !confirm(tr('이 소스를 삭제할까요? (NAS 파일은 그대로입니다)'))) return;
+    if (!editingId || !(await askConfirm(tr('이 소스를 삭제할까요? (NAS 파일은 그대로입니다)'), { okLabel: tr('삭제'), danger: true }))) return;
     await rb.source.delete(editingId);
     app.sources = app.sources.filter((s) => s.id !== editingId);
     if (app.sourceId === editingId) app.sourceId = app.sources[0]?.id || null;
