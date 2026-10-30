@@ -10,6 +10,7 @@ const clips = require('./clips');
 const blender = require('./blender');
 const addonInstall = require('./addoninstall');
 const i18n = require('./i18n');
+const jsonfile = require('./jsonfile');
 
 const SELFTEST = process.argv.includes('--selftest');
 if (SELFTEST) {
@@ -113,7 +114,12 @@ function registerIpc() {
     try {
       const entries = await sources.list(id, rel);
       const f = listingFile(id, rel);
-      fs.promises.mkdir(path.dirname(f), { recursive: true }).then(() => fs.promises.writeFile(f, JSON.stringify(entries))).catch(() => {});
+      // 목록을 먼저 돌려주고 쓴다 (다시 받을 수 있는 캐시라 fsync 는 하지 않는다)
+      setImmediate(() => {
+        try {
+          jsonfile.writeSync(f, entries, { durable: false });
+        } catch {}
+      });
       return { entries };
     } catch (e) {
       return { error: e.code ? `${e.code} ${e.message}` : e.message };
@@ -174,6 +180,7 @@ function registerIpc() {
   });
   ipcMain.on('app:relaunch', () => {
     app.relaunch({ args: process.argv.slice(1) });
+    jsonfile.flushAll(); // app.exit 은 will-quit 을 건너뛴다
     app.exit(0);
   });
 
@@ -186,7 +193,7 @@ function registerIpc() {
       if (r.canceled) return null;
       filePath = r.filePath;
     }
-    fs.writeFileSync(filePath, JSON.stringify(json, null, 1));
+    jsonfile.writeSync(filePath, json, { space: 1 }); // 쓰는 도중 꺼져도 예전 보드 파일은 온전하게
     setSetting('lastBoardFile', filePath);
     return filePath;
   });
@@ -198,16 +205,19 @@ function registerIpc() {
     return { filePath, json: JSON.parse(fs.readFileSync(filePath, 'utf8')) };
   });
   ipcMain.handle('board:autosave', (_e, json, filePath, dirty) => {
-    fs.writeFileSync(lastBoardPath(), JSON.stringify({ filePath, json, dirty: !!dirty }));
+    jsonfile.writeSync(lastBoardPath(), { filePath, json, dirty: !!dirty });
   });
   ipcMain.handle('board:restore', () => {
     try {
-      return JSON.parse(fs.readFileSync(lastBoardPath(), 'utf8'));
+      return jsonfile.readSync(lastBoardPath(), null);
     } catch {
       return null;
     }
   });
 }
+
+// 끌 때: 모아 두었다가 쓰려던 구간 / 폴더 / fps 캐시를 마저 쓴다
+app.on('will-quit', () => jsonfile.flushAll());
 
 // 작업 표시줄에서 electron.exe 가 아니라 MoRef 로 묶이게
 app.setAppUserModelId('MoRef');
@@ -226,6 +236,7 @@ if (firstInstance) app.whenReady().then(async () => {
   if (SELFTEST) {
     for (const f of ['config.json', 'last-board.refboard', 'blender-clips', 'thumbs', 'listings', 'probe-cache.json', 'clips.json', 'range-folders.json']) {
       fs.rmSync(path.join(app.getPath('userData'), f), { recursive: true, force: true });
+      fs.rmSync(path.join(app.getPath('userData'), f + '.bak'), { force: true });
     }
     sources.upsertSource({
       name: '테스트 NAS',

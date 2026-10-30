@@ -9,6 +9,7 @@ const https = require('https');
 const crypto = require('crypto');
 const { app, safeStorage } = require('electron');
 const { XMLParser } = require('fast-xml-parser');
+const jsonfile = require('./jsonfile');
 
 const VIDEO_EXT = new Set(['.mp4', '.mov', '.m4v', '.webm', '.mkv']);
 const IMAGE_EXT = new Set(['.jpg', '.jpeg', '.png', '.webp', '.gif', '.bmp']);
@@ -30,20 +31,16 @@ let config = null;
 // 서로의 변경을 덮어쓰지 않도록, 설정을 바꾸기 직전에는 항상 fresh 로 읽는다.
 function loadConfig(fresh = false) {
   if (config && !fresh) return config;
-  config = null;
-  try {
-    config = JSON.parse(fs.readFileSync(configPath(), 'utf8'));
-  } catch {
-    config = {};
-  }
+  // 깨졌으면 .bak 로, 그것도 안 되면 깨진 파일은 옮겨 두고 빈 설정 (빈 설정으로 덮어써서 NAS 연결을 잃지 않게)
+  config = jsonfile.readSync(configPath(), {});
+  if (!config || typeof config !== 'object' || Array.isArray(config)) config = {};
   config.sources ??= [];
   config.settings ??= { ffmpegPath: 'ffmpeg', alwaysOnTop: false, opacity: 1 };
   return config;
 }
 
 function saveConfig() {
-  fs.mkdirSync(path.dirname(configPath()), { recursive: true });
-  fs.writeFileSync(configPath(), JSON.stringify(config, null, 2));
+  jsonfile.writeSync(configPath(), config, { backup: true, space: 2 });
 }
 
 function encryptPassword(pw) {
@@ -60,9 +57,10 @@ function decryptPassword(stored) {
 }
 
 // 렌더러로 보낼 때는 비밀번호를 빼고 보낸다.
+// 아이디도 화면에 다시 보여 줄 일이 없으므로 있는지만 알린다.
 function publicSource(s) {
-  const { password, ...rest } = s;
-  return { ...rest, hasPassword: !!password };
+  const { password, username, ...rest } = s;
+  return { ...rest, hasPassword: !!password, hasUsername: !!username };
 }
 
 function getSource(id) {
@@ -70,13 +68,16 @@ function getSource(id) {
 }
 
 // 입력값 → 저장용 소스 객체. password 가 빈 값이면 기존 비밀번호 유지.
+// keepLogin: 설정 창이 저장된 주소 / 아이디를 숨기고 있을 때 - 빈 값이면 저장된 값을 그대로 쓴다
 function normalizeSource(input, existing) {
+  const type = input.type === 'local' ? 'local' : 'dav';
+  const keep = input.keepLogin && existing && existing.type === type;
   const s = {
     id: existing?.id || input.id || crypto.randomUUID(),
     name: (input.name || '').trim() || 'NAS',
-    type: input.type === 'local' ? 'local' : 'dav',
-    url: (input.url || '').trim(),
-    username: (input.username || '').trim(),
+    type,
+    url: (input.url || '').trim() || (keep ? existing.url : ''),
+    username: (input.username || '').trim() || (keep ? existing.username : ''),
     insecureTLS: !!input.insecureTLS,
     password: existing?.password || '',
   };
@@ -138,17 +139,57 @@ function davUrl(src, rel) {
   return new URL(enc, src.url).toString();
 }
 
-// WebDAV 요청. 응답 스트림(IncomingMessage)을 그대로 돌려준다.
+// ---------- NAS 요청 차례 ----------
+// 연결이 소스마다 하나라(agentFor) 요청은 어차피 한 줄로 선다. 그 줄을 직접 세워서 화면 재생을 먼저 보낸다.
+//  high:   보드 영상 재생 (<video> 가 기다리면 화면이 멈춘다)
+//  normal: 폴더 목록, 크기 확인(HEAD)
+//  low:    썸네일 / fps 읽기(ffmpeg), Blender 로 보낼 영상 받기 - 늦어도 티가 덜 난다
+// 응답을 끝까지 읽거나 끊으면(요청 'close') 다음 차례로 넘어간다.
+const PRIORITY = { high: 0, normal: 1, low: 2 };
+const lanes = new Map(); // 소스 id → { busy, queues: [[], [], []] }
+
+function takeTurn(id, priority) {
+  let lane = lanes.get(id);
+  if (!lane) lanes.set(id, (lane = { busy: false, queues: [[], [], []] }));
+  return new Promise((resolve) => {
+    if (!lane.busy) {
+      lane.busy = true;
+      resolve(turnDone(lane));
+    } else lane.queues[PRIORITY[priority] ?? 1].push(resolve);
+  });
+}
+
+function turnDone(lane) {
+  let done = false;
+  return () => {
+    if (done) return;
+    done = true;
+    const next = lane.queues.find((q) => q.length)?.shift();
+    if (next) next(turnDone(lane));
+    else lane.busy = false;
+  };
+}
+
+// WebDAV 요청. 응답 스트림(IncomingMessage)을 그대로 돌려준다 - 받은 쪽은 끝까지 읽거나 resume() / destroy() 해야 한다.
 // timeout: 응답이 이만큼 없으면 끊는다 (폴더 목록은 길게 - listDav)
-function davRequest(src, method, rel, { headers = {}, body, timeout = 30000 } = {}) {
+// priority: 'high' | 'normal' | 'low' (위 차례 참고)
+async function davRequest(src, method, rel, { headers = {}, body, timeout = 30000, priority = 'normal' } = {}) {
   const url = new URL(davUrl(src, rel));
   const mod = url.protocol === 'https:' ? https : http;
+  const done = await takeTurn(src.id, priority);
+  // 받은 쪽이 응답을 놓아 버려도 줄이 영영 막히지 않게: 시간 초과보다 조금 뒤에는 다음 차례로 넘긴다
+  const guard = setTimeout(done, timeout + 15000);
+  const finish = () => {
+    clearTimeout(guard);
+    done();
+  };
   return new Promise((resolve, reject) => {
     const req = mod.request(
       url,
       { method, agent: agentFor(src), headers: { ...authHeader(src), ...headers } },
       resolve
     );
+    req.on('close', finish);
     req.setTimeout(timeout, () => req.destroy(Object.assign(new Error(tr('NAS 응답 시간 초과')), { code: 'RB_TIMEOUT' })));
     req.on('error', reject);
     if (body) req.write(body);

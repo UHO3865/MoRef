@@ -140,14 +140,19 @@
               <option value="local">로컬 · SMB 폴더 (\\NAS\공유, Z:\)</option>
             </select>
           </label>
-          <label><span id="urlLabel">WebDAV 주소</span>
+          <div id="savedLogin" class="saved-login">
+            <span class="lock">🔒</span>
+            <span class="txt">주소 · 아이디가 저장되어 있습니다</span>
+            <button type="button" id="btnEditLogin" class="btn">바꾸기</button>
+          </div>
+          <label class="login-field"><span id="urlLabel">WebDAV 주소</span>
             <div class="row">
               <input name="url" placeholder="https://192.168.0.10:5006/refs" />
               <button type="button" id="btnBrowse" class="btn">찾기…</button>
             </div>
           </label>
           <div class="dav-only">
-            <label>아이디<input name="username" /></label>
+            <label class="login-field">아이디<input name="username" /></label>
             <label>비밀번호<input name="password" type="password" /></label>
             <label class="check"><input name="insecureTLS" type="checkbox" /> 자체 서명 인증서 허용 (Synology 기본 인증서 등)</label>
           </div>

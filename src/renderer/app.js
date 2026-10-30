@@ -2277,7 +2277,7 @@ function renderSrcList() {
   list.innerHTML = '';
   for (const s of app.sources) {
     const d = h('div', 'src-item' + (s.id === editingId ? ' active' : ''), s.name);
-    d.append(h('small', '', s.url));
+    d.append(h('small', '', s.type === 'dav' ? 'WebDAV' : s.url)); // WebDAV 주소는 화면에 다시 띄우지 않는다
     d.onclick = () => editSource(s);
     list.append(d);
   }
@@ -2289,9 +2289,11 @@ function editSource(s) {
   f.id.value = s?.id || '';
   f.name.value = s?.name || '';
   f.type.value = s?.type || 'dav';
-  f.url.value = s?.url || '';
-  f.username.value = s?.username || '';
+  f.url.value = s?.type === 'local' ? s.url : '';
+  f.username.value = '';
   f.password.value = '';
+  // 저장된 WebDAV 의 주소 / 아이디는 다시 보여 주지 않는다. [바꾸기] 를 눌러야 새로 넣는 칸이 열린다
+  f.classList.toggle('login-locked', s?.type === 'dav');
   f.password.placeholder = s?.hasPassword ? tr('저장됨 - 바꾸려면 새로 입력') : '';
   f.insecureTLS.checked = !!s?.insecureTLS;
   $('#btnDelSrc').style.display = s ? '' : 'none';
@@ -2300,13 +2302,19 @@ function editSource(s) {
   renderSrcList();
 }
 
+// 지금 고치는 소스가 같은 종류로 저장돼 있으면 주소 / 아이디 칸을 비워 둬도 저장된 값을 쓴다
+const savedSameType = (f) => !!f.id.value && app.sources.find((s) => s.id === f.id.value)?.type === f.type.value;
+
 function onTypeChange() {
   const f = $('#srcForm');
   const dav = f.type.value === 'dav';
+  if (!dav) f.classList.remove('login-locked'); // 로컬 폴더로 바꾸면 경로를 새로 넣어야 한다
   $('.dav-only', f).style.display = dav ? '' : 'none';
   $('#btnBrowse').style.display = dav ? 'none' : '';
   $('#urlLabel').textContent = dav ? tr('WebDAV 주소') : tr('폴더 경로');
-  f.url.placeholder = dav ? 'https://192.168.0.10:5006/refs' : tr('\\\\NAS\\refs  또는  Z:\\refs');
+  const keep = dav && savedSameType(f) ? tr('비워 두면 저장된 값을 그대로 씁니다') : '';
+  f.url.placeholder = keep || (dav ? 'https://192.168.0.10:5006/refs' : tr('\\\\NAS\\refs  또는  Z:\\refs'));
+  f.username.placeholder = keep;
 }
 
 function formData() {
@@ -2319,6 +2327,7 @@ function formData() {
     username: f.username.value,
     password: f.password.value,
     insecureTLS: f.insecureTLS.checked,
+    keepLogin: savedSameType(f), // 주소 / 아이디 칸이 비어 있으면 저장된 값 유지
   };
 }
 
@@ -2330,6 +2339,10 @@ function initSettings() {
     if (p) f.url.value = p;
   };
   $('#btnAddSrc').onclick = () => editSource(null);
+  $('#btnEditLogin').onclick = () => {
+    f.classList.remove('login-locked');
+    f.url.focus();
+  };
   $('#btnTest').onclick = async () => {
     const out = $('#testResult');
     out.className = 'test-result';
@@ -2340,7 +2353,7 @@ function initSettings() {
   };
   f.onsubmit = async (ev) => {
     ev.preventDefault();
-    if (!f.url.value.trim()) {
+    if (!f.url.value.trim() && !savedSameType(f)) {
       $('#testResult').className = 'test-result bad';
       $('#testResult').textContent = tr('주소/경로를 입력하세요');
       return;
