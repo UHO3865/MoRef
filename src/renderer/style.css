@@ -10,6 +10,24 @@
   --a: #ffb347;
   --danger: #ff5f56;
   --panel-w: 300px;
+  --font: "Pretendard", "Segoe UI", "Malgun Gothic", sans-serif;
+}
+/* 일본어 화면: 한자 / 가나는 일본어 글꼴로, 영문 · 숫자만 Pretendard (Pretendard 의 한자는 한국식 글자 모양) */
+:root:lang(ja) { --font: "Pretendard Latin", "Yu Gothic UI", "Meiryo UI", "Meiryo", sans-serif; }
+
+/* Pretendard (SIL OFL 1.1, fonts/Pretendard-LICENSE.txt): 앱에 함께 넣어 오프라인에서도 같은 모양 */
+@font-face {
+  font-family: "Pretendard";
+  src: url("fonts/PretendardVariable.woff2") format("woff2-variations");
+  font-weight: 45 920;
+  font-display: block;
+}
+@font-face {
+  font-family: "Pretendard Latin";
+  src: url("fonts/PretendardVariable.woff2") format("woff2-variations");
+  font-weight: 45 920;
+  font-display: block;
+  unicode-range: U+0000-024F, U+2000-206F, U+20A0-20CF, U+2100-218F;
 }
 
 * { box-sizing: border-box; }
@@ -18,7 +36,7 @@ html, body {
   height: 100%;
   background: var(--bg);
   color: var(--fg);
-  font: 13px/1.4 "Segoe UI", "Malgun Gothic", sans-serif;
+  font: 13px/1.4 var(--font);
   overflow: hidden;
   user-select: none;
 }
@@ -92,6 +110,8 @@ button, input, select { font: inherit; color: inherit; }
 #panel {
   position: relative;
   width: var(--panel-w);
+  max-width: calc(100vw - 120px); /* 창이 좁아도 보드가 사라지지 않게 */
+  min-width: 180px;
   flex: none;
   display: flex;
   flex-direction: column;
@@ -300,6 +320,18 @@ select:focus, input:focus { border-color: var(--accent); }
   text-align: center;
   color: var(--fg2);
   pointer-events: none;
+  padding: 0 20px;
+  word-break: keep-all; /* 한국어가 글자마다 끊겨 세로로 늘어서지 않게 */
+  overflow-wrap: anywhere;
+  container-type: size; /* 보드 크기 = 이 상자 크기. 안의 글은 @container 로 맞춘다 */
+}
+@container (max-width: 380px) {
+  .empty-hint > * { font-size: 12px; }
+  .empty-hint > .big { font-size: 15px; }
+}
+/* 보드가 아주 좁거나 낮으면 안내 글은 숨긴다 (글자가 한 줄에 한두 자씩 쌓이는 것보다 낫다) */
+@container (max-width: 220px) or (max-height: 160px) {
+  .empty-hint > * { display: none; }
 }
 .empty-hint .big { font-size: 18px; color: var(--fg); }
 .zoom-label {
@@ -693,6 +725,11 @@ select:focus, input:focus { border-color: var(--accent); }
 .src-form .row input { flex: 1; min-width: 0; }
 .src-form input, .src-form select { color: var(--fg); }
 .src-form hr { border: 0; border-top: 1px solid var(--line); width: 100%; }
+/* 저장된 WebDAV: 주소 / 아이디 칸 대신 '저장됨' 줄. [바꾸기] 를 누르면 칸이 열린다 */
+.saved-login { display: none; align-items: center; gap: 8px; padding: 8px 10px; border: 1px solid var(--line); border-radius: 6px; background: var(--bg3); color: var(--fg2); }
+.saved-login .txt { flex: 1; min-width: 0; }
+.src-form.login-locked .saved-login { display: flex; }
+.src-form.login-locked .login-field { display: none; }
 .form-actions { display: flex; gap: 6px; }
 .btn {
   padding: 5px 12px;
@@ -1394,6 +1431,8 @@ body.lib-mode .panel-head, body.lib-mode .panel-nav, body.lib-mode #filter, body
 .lf .nm { flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .lf .n { color: var(--fg2); font-size: 11px; }
 .lib-tags { display: flex; flex-wrap: wrap; gap: 4px; padding: 6px 8px; border-bottom: 1px solid var(--line); max-height: 72px; overflow-y: auto; }
+.lib-tags:empty, .lib-tags[hidden] { display: none; } /* 태그가 없으면 빈 줄과 선을 남기지 않는다 */
+#libInfo { padding-top: 8px; }
 .ltag { border: 1px solid #ffffff1f; background: var(--bg3); color: var(--fg); border-radius: 10px; padding: 1px 8px; font-size: 11.5px; cursor: pointer; display: inline-flex; gap: 4px; align-items: center; }
 .ltag small { color: var(--fg2); }
 .ltag.on { background: var(--accent); border-color: var(--accent); color: #fff; }

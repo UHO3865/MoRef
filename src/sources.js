@@ -60,9 +60,10 @@ function decryptPassword(stored) {
 }
 
 // 렌더러로 보낼 때는 비밀번호를 빼고 보낸다.
+// 아이디도 화면에 다시 보여 줄 일이 없으므로 있는지만 알린다.
 function publicSource(s) {
-  const { password, ...rest } = s;
-  return { ...rest, hasPassword: !!password };
+  const { password, username, ...rest } = s;
+  return { ...rest, hasPassword: !!password, hasUsername: !!username };
 }
 
 function getSource(id) {
@@ -70,13 +71,16 @@ function getSource(id) {
 }
 
 // 입력값 → 저장용 소스 객체. password 가 빈 값이면 기존 비밀번호 유지.
+// keepLogin: 설정 창이 저장된 주소 / 아이디를 숨기고 있을 때 - 빈 값이면 저장된 값을 그대로 쓴다
 function normalizeSource(input, existing) {
+  const type = input.type === 'local' ? 'local' : 'dav';
+  const keep = input.keepLogin && existing && existing.type === type;
   const s = {
     id: existing?.id || input.id || crypto.randomUUID(),
     name: (input.name || '').trim() || 'NAS',
-    type: input.type === 'local' ? 'local' : 'dav',
-    url: (input.url || '').trim(),
-    username: (input.username || '').trim(),
+    type,
+    url: (input.url || '').trim() || (keep ? existing.url : ''),
+    username: (input.username || '').trim() || (keep ? existing.username : ''),
     insecureTLS: !!input.insecureTLS,
     password: existing?.password || '',
   };

@@ -259,7 +259,7 @@ class GifPlayer {
       }
       // 프레임 번호
       const fs = Math.max(10, ch * 0.13);
-      g.font = `600 ${fs}px "Segoe UI", sans-serif`;
+      g.font = `600 ${fs}px Pretendard, "Segoe UI", sans-serif`;
       const label = String(i + 1);
       const tw = g.measureText(label).width;
       g.fillStyle = 'rgba(0,0,0,.65)';
