@@ -20,6 +20,7 @@ contextBridge.exposeInMainWorld('rb', {
     clear: invoke('thumb:clear'),
   },
   fileUrl: invoke('file:url'),
+  ffmpegInfo: invoke('ffmpeg:info'),
   probe: invoke('media:probe'),
   clips: {
     get: invoke('clips:get'),
@@ -61,6 +62,7 @@ contextBridge.exposeInMainWorld('rb', {
   },
   update: {
     onChange: (cb) => ipcRenderer.on('app:update', (_e, info) => cb(info)),
+    onRelease: (cb) => ipcRenderer.on('app:release', (_e, info) => cb(info)),
     relaunch: () => ipcRenderer.send('app:relaunch'),
   },
   board: {

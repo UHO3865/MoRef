@@ -1,6 +1,7 @@
 // `npm run selftest` - 실제 창을 띄워 탐색 → 보드에 열기 → 구간반복/속도 → 저장 → 닫기 → 다시 불러오기를
 // 자동으로 수행하고 단계별 스크린샷을 남긴다. 소스는 환경변수로 받는다:
 //   RB_TEST_URL, RB_TEST_TYPE(dav|local), RB_TEST_USER, RB_TEST_PASS, RB_TEST_OUT(스크린샷 폴더)
+// 시험 파일(fps · GIF · 반전 · 썸네일 단계에 필요한 것)은 scripts/make-test-media.js 로 만든다.
 const fs = require('fs');
 const path = require('path');
 const { app } = require('electron');
@@ -281,9 +282,9 @@ async function run(win) {
       // 재생 버튼 클릭 → 0.9초 뒤 위치 (1x)
       await js(`${G}.media.currentTime = 0`);
       const pb = await R(`${G}.ctl.play`);
+      const t0 = Date.now(); // click() 이 누른 뒤 잠깐 기다리므로 누르기 전부터 잰다
       await click(pb.left + pb.width / 2, pb.top + pb.height / 2);
-      const t0 = Date.now();
-      await wait(900);
+      await wait(Math.max(0, 900 - (Date.now() - t0)));
       const s1 = JSON.parse(await js(`JSON.stringify({ t: ${G}.media.currentTime, f: ${G}.media.frameIndex, paused: ${G}.media.paused })`));
       log('play 1x after', Date.now() - t0, 'ms →', JSON.stringify({ t: +s1.t.toFixed(2), frame: s1.f + 1, paused: s1.paused }), '(1x: t≈0.9 → frame 6)');
 
@@ -529,12 +530,65 @@ async function run(win) {
       // GIF: 시각 기준 (vardelay: 프레임 시작 0,50,150,300,500ms…) → Blender 12프레임@24fps = 0.5초 = 5번째 프레임
       await js(`(async () => { window.__sg = await RB.addItem({ kind: 'gif', ref: { sourceId: RB.app.sourceId, path: 'thumbtest/vardelay.gif' }, name: 'vardelay.gif', x: 14000, y: 0, paused: true }); })()`);
       await wait(1500);
+      await js(`goToItem(window.__sg)`); // 화면 밖의 항목은 맞추지 않는다 (보일 때 맞춤 - media.js)
+      await wait(600);
       await B(500);
       await js(`(() => { const g = window.__sg; g.media.currentTime = 0; toggleSync(g); })()`);
       await B(512);
       await wait(200);
       log('sync: gif B512 → frame', (await js(`window.__sg.media.frameIndex`)) + 1, '(기대 5)', '| badge', await js(`window.__sg.el.classList.contains('has-view')`));
       await js(`RB.removeItem(window.__sg)`);
+    }
+
+    // ---- 패널 미리 보기 (꾹 누르기 · 마우스 올려 두기) / 어니언 스킨 / 멈춘 보드의 갱신 횟수 ----
+    {
+      const send = (ev) => win.webContents.sendInputEvent(ev);
+      await js('RB.openFolder("")');
+      await wait(1500);
+      const c = JSON.parse(await js(`(() => { const c = document.querySelector('#grid .card.video'); if (!c) return 'null'; const r = c.getBoundingClientRect(); return JSON.stringify({ x: r.left + r.width / 2, y: r.top + r.height / 3, name: c._entry.name }); })()`));
+      if (c) {
+        const peekState = () => js(`JSON.stringify({ shown: !$('.peek').hidden, name: $('.peek .nm')?.textContent || '', t: +($('.peek video')?.currentTime || 0).toFixed(1) })`);
+        send({ type: 'mouseMove', x: c.x, y: c.y });
+        send({ type: 'mouseDown', x: c.x, y: c.y, button: 'left', clickCount: 1 });
+        await wait(1500);
+        log('peek: hold 1.5s', await peekState());
+        send({ type: 'mouseUp', x: c.x, y: c.y, button: 'left', clickCount: 1 });
+        await wait(200);
+        log('peek: released', await peekState());
+        // 마우스를 올려 두면 예고편 8장면
+        send({ type: 'mouseMove', x: c.x + 2, y: c.y });
+        let shots = '0';
+        for (let i = 0; i < 60 && shots !== '8'; i++) {
+          await wait(250);
+          shots = await js(`String(document.querySelectorAll('.card .trailer .tbar i.ok').length)`);
+        }
+        log('trailer: shots', shots);
+        send({ type: 'mouseMove', x: 900, y: 500 });
+        await wait(200);
+        log('trailer: gone after leaving', await js(`!document.querySelector('.card .trailer')`));
+      }
+      // 어니언 스킨: 영상 / GIF. 겹쳐 그린 점 수 (0 이면 실패)
+      const ghost = (it) => js(`(() => { const cv = (${it}).onionCv; if (!cv) return 'no canvas'; const d = cv.getContext('2d').getImageData(0, 0, cv.width, cv.height).data; let n = 0; for (let i = 3; i < d.length; i += 4) if (d[i] > 10) n++; return JSON.stringify({ hidden: cv.hidden, size: cv.width + 'x' + cv.height, ghostPx: n, gpu: !!onionGlState }); })()`);
+      const V = `([...RB.app.items.values()].find(i => i.name === '점프 01.mp4') || [...RB.app.items.values()].find(i => i.kind === 'video'))`;
+      await js(`(() => { const it = ${V}; it.media.pause(); seekFrame(it, 30); goToItem(it); return 1; })()`);
+      await wait(1500);
+      await js(`toggleOnion(${V}); 1`);
+      await wait(1500);
+      log('onion: video', await ghost(V));
+      await js(`toggleOnion(${V}); 1`);
+      // (자르기 점검에서 보드를 다시 불러와 항목이 새로 만들어졌다: 보드에서 찾는다)
+      const GIF = `[...RB.app.items.values()].find(i => i.kind === 'gif')`;
+      if (!(await js(`!!${GIF}`))) log('onion: gif skipped (no gif on board)');
+      else {
+        await js(`(() => { const g = ${GIF}; g.media.pause(); g.media.stepFrame(1); goToItem(g); setOnion(g, 2); return 1; })()`);
+        await wait(1200);
+        log('onion: gif', await ghost(GIF));
+        await js(`setOnion(${GIF}, 0); 1`);
+      }
+      // 모두 멈춘 보드: 1초에 4번만 갱신 (재생 중이면 매 화면)
+      await js(`(() => { for (const it of RB.app.items.values()) if (it.media?.pause) { it.autoPaused = false; it.media.pause(); } return 1; })()`);
+      await wait(800);
+      log('idle board: ticks in 1s', await js(`new Promise((r) => { let n = 0; const o = tick; tick = function () { n++; return o(); }; setTimeout(() => { tick = o; r(n); }, 1000); })`));
     }
 
     // 저장 → 전부 닫기 → 다시 불러오기

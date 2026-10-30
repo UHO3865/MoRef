@@ -6,13 +6,15 @@
 //  * 재생 중에는 숨긴다 (멈추거나 한 프레임씩 넘길 때 보인다)
 //  * 영상: 옆 프레임은 숨은 <video> 하나로 읽는다 (켤 때 만들고 끄면 닫는다). 읽은 프레임은 기억해 두어
 //    한 프레임씩 넘길 때는 새로 생긴 끝 프레임 하나만 더 읽는다. GIF: 이미 읽어 둔 프레임을 쓴다
+//  * 합치기는 GPU(WebGL 셰이더)로: 화면 스레드를 막지 않고 1280px 까지 그린다. WebGL 이 없으면 CPU 로 640px
 
 const ONION_COUNTS = [1, 2, 3];
-const ONION_MAX_W = 640; // 이 너비로 줄여서 계산한다 (큰 영상도 느리지 않게)
+const ONION_MAX_W_GPU = 1280; // 이 너비로 줄여서 합친다
+const ONION_MAX_W = 640; // CPU 로 합칠 때 (느리지 않게)
 const ONION_BEFORE = [60, 220, 110];
 const ONION_AFTER = [80, 150, 255];
 const ONION_DIFF = 14; // 이보다 작은 차이는 같은 것으로 (압축 노이즈)
-const ONION_CACHE = 24; // 영상마다 기억해 둘 프레임 수
+const ONION_CACHE = 12; // 영상마다 기억해 둘 프레임 수 (앞뒤 3 + 한 칸씩 넘길 때 다시 쓰는 것)
 
 function toggleOnion(it) {
   if (!isTimed(it)) return;
@@ -40,7 +42,8 @@ function closeOnion(it) {
   it.onionCv?.remove();
   it.onionCv = null;
   it.onionKey = null;
-  it.onionFrames?.clear();
+  clearFrames(it);
+  it.onionFrames = null;
   if (it.onionVid) {
     it.onionVid.removeAttribute('src');
     it.onionVid.load(); // NAS 스트림을 닫는다
@@ -78,33 +81,137 @@ async function renderOnion(it, f, gen) {
   const W0 = it.kind === 'gif' ? it.media.videoWidth : src.videoWidth;
   const H0 = it.kind === 'gif' ? it.media.videoHeight : src.videoHeight;
   if (!W0 || !H0) return;
-  const s = Math.min(1, ONION_MAX_W / W0);
+  const gpu = onionGl();
+  const s = Math.min(1, (gpu ? ONION_MAX_W_GPU : ONION_MAX_W) / W0);
   const W = Math.max(1, Math.round(W0 * s));
   const H = Math.max(1, Math.round(H0 * s));
   if (it.onionSize !== `${W}x${H}`) {
     it.onionSize = `${W}x${H}`;
-    it.onionFrames?.clear();
+    clearFrames(it);
   }
   cv.width = W;
   cv.height = H;
   const ctx = cv.getContext('2d');
-  const cur = grab(src, W, H);
+  // 지금 프레임: GPU 는 영상 / GIF 캔버스를 그대로 올리고, CPU 는 픽셀을 읽는다
+  const cur = gpu ? src : grab(src, W, H);
   if (!cur) return;
   const total = it.kind === 'gif' ? it.media.frameCount : totalFrames(it);
   const n = it.onion;
-  const out = ctx.createImageData(W, H);
-  // 먼 프레임부터 그려서 가까운 프레임이 위에 오게
+  // 먼 프레임부터 (가까운 프레임이 위에 오게). 하나 읽을 때마다 다시 합쳐 보여 준다
+  const ghosts = [];
+  const out = gpu ? null : ctx.createImageData(W, H);
   for (let d = n; d >= 1; d--) {
     for (const dir of [-1, 1]) {
       const i = f + dir * d;
       if (i < 0 || i >= total) continue;
-      const g = await onionFrame(it, i, W, H);
+      const bmp = await onionFrame(it, i, W, H);
       if (gen !== it.onionGen) return;
-      if (!g) continue;
-      blendGhost(out.data, cur.data, g.data, dir < 0 ? ONION_BEFORE : ONION_AFTER, 0.75 * (1 - (d - 1) / (n + 1)));
-      ctx.putImageData(out, 0, 0); // 하나 읽을 때마다 보여 준다
+      if (!bmp) continue;
+      const g = { bmp, tint: dir < 0 ? ONION_BEFORE : ONION_AFTER, alpha: 0.75 * (1 - (d - 1) / (n + 1)) };
+      if (gpu) {
+        ghosts.push(g);
+        if (!blendGpu(gpu, cur, ghosts, W, H)) return; // 영상 프레임을 올리지 못함 (아주 드묾): 다음에
+        ctx.clearRect(0, 0, W, H);
+        ctx.drawImage(gpu.canvas, 0, 0);
+      } else {
+        const gd = grab(bmp, W, H);
+        if (gd) blendGhost(out.data, cur.data, gd.data, g.tint, g.alpha);
+        ctx.putImageData(out, 0, 0);
+      }
     }
   }
+}
+
+/* ---------- GPU 로 합치기 (WebGL 하나를 모든 영상이 같이 쓴다) ---------- */
+
+const ONION_VS = 'attribute vec2 p; varying vec2 uv; void main() { uv = (p + 1.0) * 0.5; gl_Position = vec4(p, 0.0, 1.0); }';
+// blendGhost 와 같은 계산: 지금 프레임과 다른 곳만 그 프레임 색 20% + 이전(초록) / 다음(파랑) 색 80%
+const ONION_FS = `precision mediump float;
+uniform sampler2D cur; uniform sampler2D gh; uniform vec3 tint; uniform float alpha; uniform float diff;
+varying vec2 uv;
+void main() {
+  vec3 c = texture2D(cur, uv).rgb;
+  vec3 g = texture2D(gh, uv).rgb;
+  float d = (abs(g.r - c.r) + abs(g.g - c.g) + abs(g.b - c.b)) / 3.0 * 255.0;
+  if (d < diff) discard;
+  float a = min(1.0, (d - diff) / 40.0) * alpha;
+  gl_FragColor = vec4((g * 0.2 + tint / 255.0 * 0.8) * a, a);
+}`;
+
+let onionGlState; // undefined: 아직 / null: 쓸 수 없음 (CPU 로)
+function onionGl() {
+  if (onionGlState !== undefined) return onionGlState;
+  onionGlState = null;
+  try {
+    const canvas = document.createElement('canvas');
+    const gl = canvas.getContext('webgl', { premultipliedAlpha: true, alpha: true, antialias: false });
+    if (!gl) return null;
+    const sh = (type, code) => {
+      const s = gl.createShader(type);
+      gl.shaderSource(s, code);
+      gl.compileShader(s);
+      if (!gl.getShaderParameter(s, gl.COMPILE_STATUS)) throw new Error(gl.getShaderInfoLog(s));
+      return s;
+    };
+    const prog = gl.createProgram();
+    gl.attachShader(prog, sh(gl.VERTEX_SHADER, ONION_VS));
+    gl.attachShader(prog, sh(gl.FRAGMENT_SHADER, ONION_FS));
+    gl.linkProgram(prog);
+    if (!gl.getProgramParameter(prog, gl.LINK_STATUS)) throw new Error(gl.getProgramInfoLog(prog));
+    gl.useProgram(prog);
+    const buf = gl.createBuffer();
+    gl.bindBuffer(gl.ARRAY_BUFFER, buf);
+    gl.bufferData(gl.ARRAY_BUFFER, new Float32Array([-1, -1, 1, -1, -1, 1, 1, 1]), gl.STATIC_DRAW);
+    const p = gl.getAttribLocation(prog, 'p');
+    gl.enableVertexAttribArray(p);
+    gl.vertexAttribPointer(p, 2, gl.FLOAT, false, 0, 0);
+    const tex = () => {
+      const t = gl.createTexture();
+      gl.bindTexture(gl.TEXTURE_2D, t);
+      for (const k of [gl.TEXTURE_WRAP_S, gl.TEXTURE_WRAP_T]) gl.texParameteri(gl.TEXTURE_2D, k, gl.CLAMP_TO_EDGE);
+      for (const k of [gl.TEXTURE_MIN_FILTER, gl.TEXTURE_MAG_FILTER]) gl.texParameteri(gl.TEXTURE_2D, k, gl.LINEAR);
+      return t;
+    };
+    const texCur = tex();
+    const texGh = tex();
+    gl.uniform1i(gl.getUniformLocation(prog, 'cur'), 0);
+    gl.uniform1i(gl.getUniformLocation(prog, 'gh'), 1);
+    gl.uniform1f(gl.getUniformLocation(prog, 'diff'), ONION_DIFF);
+    gl.pixelStorei(gl.UNPACK_FLIP_Y_WEBGL, true);
+    gl.enable(gl.BLEND);
+    gl.blendFunc(gl.ONE, gl.ONE_MINUS_SRC_ALPHA); // 미리 곱한 알파로 겹치기
+    onionGlState = { gl, canvas, texCur, texGh, uTint: gl.getUniformLocation(prog, 'tint'), uAlpha: gl.getUniformLocation(prog, 'alpha') };
+  } catch (e) {
+    console.warn('어니언 스킨: WebGL 을 쓸 수 없어 CPU 로 합칩니다', e.message);
+  }
+  return onionGlState;
+}
+
+function blendGpu(st, cur, ghosts, W, H) {
+  const { gl, canvas } = st;
+  if (canvas.width !== W || canvas.height !== H) {
+    canvas.width = W;
+    canvas.height = H;
+  }
+  gl.viewport(0, 0, W, H);
+  gl.clearColor(0, 0, 0, 0);
+  gl.clear(gl.COLOR_BUFFER_BIT);
+  try {
+    gl.activeTexture(gl.TEXTURE0);
+    gl.bindTexture(gl.TEXTURE_2D, st.texCur);
+    gl.texImage2D(gl.TEXTURE_2D, 0, gl.RGBA, gl.RGBA, gl.UNSIGNED_BYTE, cur);
+  } catch {
+    return false;
+  }
+  gl.activeTexture(gl.TEXTURE1);
+  gl.bindTexture(gl.TEXTURE_2D, st.texGh);
+  for (const g of ghosts) {
+    gl.texImage2D(gl.TEXTURE_2D, 0, gl.RGBA, gl.RGBA, gl.UNSIGNED_BYTE, g.bmp);
+    gl.uniform3f(st.uTint, ...g.tint);
+    gl.uniform1f(st.uAlpha, g.alpha);
+    gl.drawArrays(gl.TRIANGLE_STRIP, 0, 4);
+  }
+  return true;
 }
 
 let grabCv = null;
@@ -131,16 +238,32 @@ async function onionFrame(it, i, W, H) {
   }
   const img = it.kind === 'gif' ? await gifFrame(it, i, W, H) : await videoFrame(it, i, W, H);
   if (!img) return null;
+  if (!it.onionFrames) {
+    img.close(); // 기다리는 사이에 꺼졌다
+    return null;
+  }
   it.onionFrames.set(i, img);
-  while (it.onionFrames.size > ONION_CACHE) it.onionFrames.delete(it.onionFrames.keys().next().value);
+  while (it.onionFrames.size > ONION_CACHE) {
+    const [k, old] = it.onionFrames.entries().next().value;
+    it.onionFrames.delete(k);
+    old.close();
+  }
   return img;
 }
+
+function clearFrames(it) {
+  for (const b of it.onionFrames?.values() || []) b.close();
+  it.onionFrames?.clear();
+}
+
+// 프레임은 계산할 크기로 줄인 ImageBitmap 으로 둔다 (GPU 에 바로 올라간다)
+const shrink = (src, W, H) => createImageBitmap(src, { resizeWidth: W, resizeHeight: H, resizeQuality: 'medium' });
 
 async function gifFrame(it, i, W, H) {
   const g = it.media;
   const bmp = await g._bitmap(i).catch(() => null);
   if (!bmp) return null;
-  const img = grab(bmp, W, H);
+  const img = await shrink(bmp, W, H).catch(() => null);
   if (!g.bitmaps.has(i)) bmp.close();
   return img;
 }
@@ -160,7 +283,7 @@ function videoFrame(it, i, W, H) {
     if (v.readyState < 1 && !(await once(v, 'loadedmetadata'))) return null;
     v.currentTime = (i + 0.5) / fpsOf(it); // 프레임 가운데 (seekFrame 과 같게)
     if (!(await once(v, 'seeked'))) return null;
-    return grab(v, W, H);
+    return shrink(v, W, H).catch(() => null);
   };
   it.onionQ = (it.onionQ || Promise.resolve()).then(run, run);
   return it.onionQ;

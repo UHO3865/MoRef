@@ -5,8 +5,8 @@ const path = require('path');
 const { spawn } = require('child_process');
 const { app } = require('electron');
 const proxy = require('./proxy');
-const sources = require('./sources');
 const jsonfile = require('./jsonfile');
+const { ffprobePath } = require('./ffmpeg');
 
 const MAX_PARALLEL = 3;
 const TIMEOUT_MS = 20000;
@@ -37,12 +37,6 @@ function clearCache() {
 
 const cacheWriter = jsonfile.writer(cacheFile, () => cache, { delay: 1000, durable: false });
 const saveCache = () => cacheWriter.save();
-
-// 설정의 ffmpeg 경로 옆에 있는 ffprobe
-function ffprobePath() {
-  const ff = sources.loadConfig().settings.ffmpegPath || 'ffmpeg';
-  return ff.replace(/ffmpeg(\.exe)?$/i, (m) => (m.toLowerCase().endsWith('.exe') ? 'ffprobe.exe' : 'ffprobe'));
-}
 
 // "24000/1001" → 23.976…
 function rational(s) {

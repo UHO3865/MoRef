@@ -16,7 +16,7 @@ const crypto = require('crypto');
 const { spawn } = require('child_process');
 const { app } = require('electron');
 const proxy = require('./proxy');
-const sources = require('./sources');
+const { ffmpegPath } = require('./ffmpeg');
 
 const MAX_PARALLEL = 4;
 const TIMEOUT_MS = 30000;
@@ -115,7 +115,7 @@ function rememberFailure(key, error) {
 
 function runFfmpeg(args) {
   return new Promise((resolve) => {
-    const ffmpeg = sources.loadConfig().settings.ffmpegPath || 'ffmpeg';
+    const ffmpeg = ffmpegPath();
     let stderr = '';
     const out = [];
     let proc;

@@ -1484,3 +1484,6 @@ body.lib-mode .panel-head, body.lib-mode .panel-nav, body.lib-mode #filter, body
 
 /* 어니언 스킨 (onion.js): 영상 위, 그림(anno) 아래 */
 .vis > canvas.onion { pointer-events: none; }
+
+/* 설정: 지금 쓰는 ffmpeg */
+#ffmpegInfo { font-size: 11px; color: var(--fg2); margin: -2px 0 8px; }

@@ -6,3 +6,5 @@ __pycache__/
 *.pyc
 # 빌드할 때 만드는 애드온 zip (릴리즈에 올림)
 blender/refboard_dock.zip
+# 설치 파일에 넣을 ffmpeg (npm run ffmpeg 이 받는다 - scripts/fetch-ffmpeg.js)
+vendor/

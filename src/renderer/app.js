@@ -2307,9 +2307,17 @@ let editingId = null;
 function openSettings() {
   refreshAddonStatus();
   $('#settings').classList.remove('hidden');
-  $('#ffmpegPath').value = app.settings.ffmpegPath || 'ffmpeg';
+  $('#ffmpegPath').value = app.settings.ffmpegPath && app.settings.ffmpegPath !== 'ffmpeg' ? app.settings.ffmpegPath : '';
+  $('#checkUpdates').checked = app.settings.checkUpdates !== false;
+  showFfmpegInfo();
   renderSrcList();
   editSource(app.sources.find((s) => s.id === (editingId || app.sourceId)) || app.sources[0] || null);
+}
+
+// 지금 쓰는 ffmpeg: 직접 지정 / MoRef 에 들어 있는 것 / PATH
+async function showFfmpegInfo() {
+  const i = await rb.ffmpegInfo();
+  $('#ffmpegInfo').textContent = i.custom ? tr('지정한 ffmpeg 를 씁니다') : i.bundled ? tr('MoRef 에 들어 있는 ffmpeg 를 씁니다') : tr('PATH 의 ffmpeg 를 씁니다 (MoRef 에 들어 있지 않음)');
 }
 
 function renderSrcList() {
@@ -2418,9 +2426,14 @@ function initSettings() {
     renderSourceSelect();
     openFolder('');
   };
-  $('#ffmpegPath').onchange = (e) => {
-    app.settings.ffmpegPath = e.target.value.trim() || 'ffmpeg';
-    rb.setSetting('ffmpegPath', app.settings.ffmpegPath);
+  $('#checkUpdates').onchange = (e) => {
+    app.settings.checkUpdates = e.target.checked;
+    rb.setSetting('checkUpdates', e.target.checked);
+  };
+  $('#ffmpegPath').onchange = async (e) => {
+    app.settings.ffmpegPath = e.target.value.trim() || 'ffmpeg'; // 'ffmpeg' = 자동 (src/ffmpeg.js)
+    await rb.setSetting('ffmpegPath', app.settings.ffmpegPath);
+    showFfmpegInfo();
   };
   $('#btnClearThumbs').onclick = async () => {
     const freed = await rb.thumb.clear();

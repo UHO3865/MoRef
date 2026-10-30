@@ -158,6 +158,7 @@ function registerIpc() {
   ipcMain.on('thumb:drop', (_e, entry) => thumbs.drop(entry));
   ipcMain.on('thumb:cancel', () => thumbs.cancelQueued());
   ipcMain.handle('thumb:clear', () => caches.clearAll()); // 썸네일만이 아니라 다시 만들 수 있는 캐시 전부
+  ipcMain.handle('ffmpeg:info', () => require('./ffmpeg').describe());
 
   ipcMain.handle('file:url', (_e, abs) => proxy.fileUrl(abs));
   ipcMain.handle('media:probe', (_e, ref) => probe.probe(ref));
@@ -269,6 +270,8 @@ if (firstInstance) app.whenReady().then(async () => {
   createWindow();
   // 새 버전 알림은 소스 폴더에서 실행할 때만 (설치판은 코드가 바뀌지 않는다)
   if ((!SELFTEST && !app.isPackaged) || process.env.RB_WATCH) watchForUpdates();
+  // 설치판: GitHub 의 새 릴리스 알림 (소스 폴더는 위의 코드 변경 알림을 쓴다)
+  if ((!SELFTEST && app.isPackaged) || process.env.RB_RELEASE_URL) require('./release').start(win, { force: !!process.env.RB_RELEASE_URL });
   if (!SELFTEST) rememberAppPath();
   if (!SELFTEST || process.env.RB_ADDON_TEST) win.webContents.once('did-finish-load', checkBlenderAddon);
 });

@@ -163,7 +163,9 @@
           </div>
           <div id="testResult" class="test-result"></div>
           <hr />
-          <label>FFmpeg 경로<input id="ffmpegPath" placeholder="ffmpeg" /></label>
+          <label>FFmpeg 경로<input id="ffmpegPath" placeholder="비워 두면 자동 (MoRef 에 들어 있는 것)" /></label>
+          <div id="ffmpegInfo" class="hint"></div>
+          <label class="check"><input id="checkUpdates" type="checkbox" /> 새 버전이 나오면 알려 주기 (GitHub 에서 확인)</label>
           <button type="button" id="btnClearThumbs" class="btn" title="썸네일 · 예고편 · 폴더 목록 · Blender 로 보낸 영상 · 받아 둔 영상 조각 (NAS 원본은 그대로)">캐시 비우기</button>
           <hr />
           <button type="button" id="btnAddon" class="btn" title="MoRef 안에 들어 있는 애드온을 이 PC 의 Blender(4.2 이상)에 복사합니다. 다음에 Blender 를 켤 때 자동으로 켜집니다">Blender 애드온 설치 / 업데이트</button>
