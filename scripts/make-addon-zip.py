@@ -1,4 +1,4 @@
-"""Blender 애드온 zip 만들기: blender/refboard_dock.zip 과 dist/RefBoard-Blender-Addon-<버전>.zip (릴리즈용)
+"""Blender 애드온 zip 만들기: blender/refboard_dock.zip 과 dist/MoRef-Blender-Addon-<버전>.zip (릴리즈용)
 
     python scripts/make-addon-zip.py
 """
@@ -19,4 +19,4 @@ def write(out):
 
 version = json.load(open(os.path.join(ROOT, "package.json"), encoding="utf8"))["version"]
 write(os.path.join(ROOT, "blender", "refboard_dock.zip"))
-write(os.path.join(ROOT, "dist", f"RefBoard-Blender-Addon-{version}.zip"))
+write(os.path.join(ROOT, "dist", f"MoRef-Blender-Addon-{version}.zip"))

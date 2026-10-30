@@ -981,7 +981,7 @@ function markDirty() {
 function updateTitle() {
   const name = app.boardFile ? app.boardFile.split(/[\\/]/).pop() : tr('제목 없음');
   $('#boardName').textContent = (app.dirty ? '● ' : '') + name;
-  document.title = `${name} - RefBoard`;
+  document.title = `${name} - MoRef`;
 }
 
 let nextId = 1;

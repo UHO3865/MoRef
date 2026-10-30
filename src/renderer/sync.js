@@ -108,7 +108,7 @@ function toggleSync(it) {
     toast(tr('Blender 동기화 끔'));
   } else {
     if (!app.blender) {
-      return toast(app.linked ? tr('Blender 타임라인 정보를 기다리는 중입니다') : tr('Blender 와 연결되어 있지 않습니다 - Blender 에서 RefBoard 애드온을 켜세요'));
+      return toast(app.linked ? tr('Blender 타임라인 정보를 기다리는 중입니다') : tr('Blender 와 연결되어 있지 않습니다 - Blender 에서 MoRef 애드온을 켜세요'));
     }
     it.sync = { b0: app.blender.frame, t0: it.media.currentTime };
     toast(tr('Blender {0} 프레임 = 레퍼런스 {1} 프레임으로 맞췄습니다', app.blender.frame, currentFrame(it) + 1), 2400);
@@ -179,7 +179,7 @@ function updateSyncUi(it) {
 
 const refKey = (it) => (it.ref.file ? 'f|' + it.ref.file : `${it.ref.sourceId}|${it.ref.path}`);
 
-// Blender 가 매 프레임 같은 영상 프레임을 고르도록 RefBoard 의 대응 규칙을 그대로 보낸다 (syncTarget 과 같은 식)
+// Blender 가 매 프레임 같은 영상 프레임을 고르도록 MoRef 의 대응 규칙을 그대로 보낸다 (syncTarget 과 같은 식)
 // 맞추지 않은 영상은 "지금 Blender 프레임 = 지금 영상 시각" 으로 한 번 정한다
 function refMap(it) {
   const d = durOf(it) || 0;

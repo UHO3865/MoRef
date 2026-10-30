@@ -1,8 +1,8 @@
-<p align="center"><img src="assets/icon.png" width="96" alt="RefBoard ロゴ"></p>
+<p align="center"><img src="assets/icon.png" width="96" alt="MoRef ロゴ"></p>
 
 <p align="center"><a href="README.md">한국어</a> · <a href="README.en.md">English</a> · <b>日本語</b></p>
 
-# RefBoard
+# MoRef
 
 **NAS の動画リファレンスをボードに並べ、Blender のタイムラインに合わせて見られるアプリ**です。
 
@@ -18,8 +18,8 @@ https://github.com/user-attachments/assets/77820e48-c7a9-4285-9323-775c173bb6a0
 
 | ファイル | 内容 |
 | --- | --- |
-| `RefBoard-Setup-x.y.z.exe` | Windows インストーラー (Windows 10/11, 64 ビット) |
-| `RefBoard-Blender-Addon-x.y.z.zip` | Blender アドオン (Blender 4.2 以降)。インストーラーにも含まれているので、別途ダウンロードしなくてもかまいません |
+| `MoRef-Setup-x.y.z.exe` | Windows インストーラー (Windows 10/11, 64 ビット) |
+| `MoRef-Blender-Addon-x.y.z.zip` | Blender アドオン (Blender 4.2 以降)。インストーラーにも含まれているので、別途ダウンロードしなくてもかまいません |
 
 - コード署名がないため、初回実行時に SmartScreen の警告が出ることがあります。**詳細情報 ▸ 実行** を押してください。
 - **FFmpeg が必要です。** PATH にあればそのまま使い、なければ設定で `ffmpeg.exe` のパスを指定します。
@@ -65,7 +65,7 @@ npm run addon
 
 ## サポート
 
-RefBoard が役に立ったら、コーヒー 1 杯で応援してください。
+MoRef が役に立ったら、コーヒー 1 杯で応援してください。
 
 <a href="https://buymeacoffee.com/uho3865"><img src="https://img.shields.io/badge/Buy%20Me%20a%20Coffee-ffdd00?style=for-the-badge&logo=buy-me-a-coffee&logoColor=black" alt="Buy Me a Coffee"></a>
 

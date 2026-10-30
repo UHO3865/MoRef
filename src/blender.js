@@ -1,15 +1,15 @@
 // Blender 애드온과의 연결
 //
-// 데스크톱 RefBoard 가 127.0.0.1 의 빈 포트에서 기다리고, 포트와 일회용 토큰을
-// %APPDATA%\refboard\blender-link.json 에 적어 둔다. 애드온은 이 파일을 보고 접속해 첫 줄로 "auth <토큰>" 을 보낸다.
-// (어느 쪽을 먼저 켜도 된다. RefBoard 를 끄면 파일을 지운다)
+// 데스크톱 MoRef 가 127.0.0.1 의 빈 포트에서 기다리고, 포트와 일회용 토큰을
+// %APPDATA%\MoRef\blender-link.json 에 적어 둔다. 애드온은 이 파일을 보고 접속해 첫 줄로 "auth <토큰>" 을 보낸다.
+// (어느 쪽을 먼저 켜도 된다. MoRef 를 끄면 파일을 지운다)
 //
-// Blender → RefBoard (한 줄씩)
+// Blender → MoRef (한 줄씩)
 //   hello <파일 이름>                 연결됨 (제목 표시줄에 보여 준다)
 //   frame <번호> <fps> <재생중 0|1> <장면 시작>   타임라인
-//   focus                             RefBoard 창을 앞으로 (Blender 의 "RefBoard 열기")
-//   toast <글>                        RefBoard 에 알림 띄우기
-// RefBoard → Blender
+//   focus                             MoRef 창을 앞으로 (Blender 의 "MoRef 열기")
+//   toast <글>                        MoRef 에 알림 띄우기
+// MoRef → Blender
 //   want play                         Blender 재생 켜기/끄기 (타임라인에 맞춘 레퍼런스에서 Space)
 //   range <시작> <끝> | range none     반복 구간 → Blender 미리보기 범위 (프레임)
 //   bg <JSON>                         카메라 배경 영상으로 넣기 {path, name, fps, frame, flipX, sync}
@@ -90,7 +90,7 @@ function listen(w, { publish = true } = {}) {
       app.on('will-quit', () => {
         try {
           const cur = JSON.parse(fs.readFileSync(linkFile(), 'utf8'));
-          if (cur.pid === process.pid) fs.unlinkSync(linkFile()); // 다른 RefBoard 가 덮어쓴 것은 두기
+          if (cur.pid === process.pid) fs.unlinkSync(linkFile()); // 다른 MoRef 가 덮어쓴 것은 두기
         } catch {}
       });
     }

@@ -1,8 +1,8 @@
-<p align="center"><img src="assets/icon.png" width="96" alt="RefBoard 로고"></p>
+<p align="center"><img src="assets/icon.png" width="96" alt="MoRef 로고"></p>
 
 <p align="center"><b>한국어</b> · <a href="README.en.md">English</a> · <a href="README.ja.md">日本語</a></p>
 
-# RefBoard
+# MoRef
 
 **NAS의 영상 레퍼런스를 보드에 띄우고, Blender 타임라인에 맞춰 보는 앱**입니다.
 
@@ -18,8 +18,8 @@ https://github.com/user-attachments/assets/2c60ea89-3a38-4594-82d6-5f23b848b247
 
 | 파일 | 내용 |
 | --- | --- |
-| `RefBoard-Setup-x.y.z.exe` | Windows 설치 프로그램 (Windows 10/11, 64비트) |
-| `RefBoard-Blender-Addon-x.y.z.zip` | Blender 애드온 (Blender 4.2 이상). 설치 프로그램에도 들어 있어서 따로 받지 않아도 됩니다 |
+| `MoRef-Setup-x.y.z.exe` | Windows 설치 프로그램 (Windows 10/11, 64비트) |
+| `MoRef-Blender-Addon-x.y.z.zip` | Blender 애드온 (Blender 4.2 이상). 설치 프로그램에도 들어 있어서 따로 받지 않아도 됩니다 |
 
 - 코드 서명이 없어서 처음 실행할 때 SmartScreen 경고가 나올 수 있습니다. **추가 정보 ▸ 실행**을 누르세요.
 - **FFmpeg가 필요합니다.** PATH에 있으면 그대로 쓰고, 아니면 설정에서 `ffmpeg.exe` 경로를 지정합니다.
@@ -65,9 +65,9 @@ npm run addon
 
 ## 후원
 
-RefBoard가 도움이 됐다면 커피 한 잔으로 응원해 주세요.<br>
-If RefBoard helps you, you can buy me a coffee.<br>
-RefBoard が役に立ったら、コーヒー 1 杯で応援してください。
+MoRef가 도움이 됐다면 커피 한 잔으로 응원해 주세요.<br>
+If MoRef helps you, you can buy me a coffee.<br>
+MoRef が役に立ったら、コーヒー 1 杯で応援してください。
 
 <a href="https://buymeacoffee.com/uho3865"><img src="https://img.shields.io/badge/Buy%20Me%20a%20Coffee-ffdd00?style=for-the-badge&logo=buy-me-a-coffee&logoColor=black" alt="Buy Me a Coffee"></a>
 

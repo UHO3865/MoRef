@@ -1,26 +1,26 @@
-"""RefBoard 연결 - 데스크톱 RefBoard(영상 레퍼런스 보드)를 Blender 와 이어 준다.
+"""MoRef 연결 - 데스크톱 MoRef(영상 레퍼런스 보드)를 Blender 와 이어 준다.
 
-RefBoard 는 따로 띄운 데스크톱 창 그대로 쓰고(항상 위 / 투명도로 Blender 위에 둘 수 있다), 이 애드온은 둘을 잇기만 한다.
+MoRef 는 따로 띄운 데스크톱 창 그대로 쓰고(항상 위 / 투명도로 Blender 위에 둘 수 있다), 이 애드온은 둘을 잇기만 한다.
 
-  * 연결: RefBoard 가 켜질 때 %APPDATA%\\refboard\\blender-link.json 에 포트와 일회용 토큰을 적어 둔다.
+  * 연결: MoRef 가 켜질 때 %APPDATA%\\MoRef\\blender-link.json 에 포트와 일회용 토큰을 적어 둔다.
     애드온은 이 파일을 보고 127.0.0.1 로 접속한다. 어느 쪽을 먼저 켜도 되고, 다시 켜면 다시 잇는다.
-  * 타임라인: 현재 프레임 / fps / 재생 중 여부를 보낸다. RefBoard 에서 🔗(Blender 타임라인에 맞추기)를 켠
+  * 타임라인: 현재 프레임 / fps / 재생 중 여부를 보낸다. MoRef 에서 🔗(Blender 타임라인에 맞추기)를 켠
     레퍼런스가 따라 움직인다.
   * 구간 반복: 맞춘 레퍼런스에 반복 구간이 있으면 씬의 미리보기 범위를 그 구간으로 바꿔 Blender 재생도 같은
     구간을 돈다. 구간을 끄거나 연결이 끊기면 원래 미리보기 범위로 되돌린다.
   * 재생: 맞춘 레퍼런스에서 Space / 재생 버튼을 누르면 Blender 재생을 켜고 끈다.
-  * 카메라 배경: RefBoard 에서 영상을 보내면 활성 카메라의 배경 영상(무비 클립)으로 넣는다.
-  * 열기: 상단 바의 RefBoard 버튼 / Ctrl+Alt+R / 3D 뷰 사이드바(N) ▸ RefBoard.
-    RefBoard 가 꺼져 있으면 켜고, 켜져 있으면 앞으로 가져온다.
+  * 카메라 배경: MoRef 에서 영상을 보내면 활성 카메라의 배경 영상(무비 클립)으로 넣는다.
+  * 열기: 상단 바의 MoRef 버튼 / Ctrl+Alt+R / 3D 뷰 사이드바(N) ▸ MoRef.
+    MoRef 가 꺼져 있으면 켜고, 켜져 있으면 앞으로 가져온다.
 """
 
 bl_info = {
-    "name": "RefBoard 연결",
-    "author": "RefBoard",
-    "version": (0, 3, 0),
+    "name": "MoRef 연결",
+    "author": "MoRef",
+    "version": (0, 5, 0),
     "blender": (4, 2, 0),
-    "location": "상단 바 RefBoard 버튼 · Ctrl+Alt+R · 3D 뷰 사이드바(N) ▸ RefBoard",
-    "description": "데스크톱 RefBoard 영상 레퍼런스 보드와 Blender 타임라인 / 구간 반복 / 재생 / 카메라 배경을 연결",
+    "location": "상단 바 MoRef 버튼 · Ctrl+Alt+R · 3D 뷰 사이드바(N) ▸ MoRef",
+    "description": "데스크톱 MoRef 영상 레퍼런스 보드와 Blender 타임라인 / 구간 반복 / 재생 / 카메라 배경을 연결",
     "category": "Interface",
 }
 
@@ -41,12 +41,12 @@ RETRY = 1.0  # 연결이 없을 때 다시 찾는 간격 (초)
 
 
 class _State:
-    sock = None  # RefBoard 연결 (양방향)
+    sock = None  # MoRef 연결 (양방향)
     rbuf = b""
     next_try = 0.0
     last_sent = None  # 마지막으로 보낸 타임라인 상태
     preview_saved = None  # 구간 반복 전의 (미리보기 범위 사용, 시작, 끝) - 되돌리기용
-    launched_at = 0.0  # 마지막으로 RefBoard 를 켠 시각 (여는 중 표시)
+    launched_at = 0.0  # 마지막으로 MoRef 를 켠 시각 (여는 중 표시)
 
 
 S = _State()
@@ -58,34 +58,35 @@ def _prefs():
 
 def _user_data():
     base = os.environ.get("APPDATA") or os.path.join(os.path.expanduser("~"), ".config")
-    return os.path.join(base, "refboard")
+    new = os.path.join(base, "MoRef")
+    return new if os.path.isdir(new) else os.path.join(base, "refboard")  # 이름을 바꾸기 전(RefBoard) 폴더
 
 
 def _find_refboard():
-    """RefBoard 를 켤 명령 [실행 파일, 인자…] 과 어디서 찾았는지. 못 찾으면 (None, 이유)
-      1. RefBoard 가 켜질 때마다 적어 두는 위치 (app-path.json)
+    """MoRef 를 켤 명령 [실행 파일, 인자…] 과 어디서 찾았는지. 못 찾으면 (None, 이유)
+      1. MoRef 가 켜질 때마다 적어 두는 위치 (app-path.json)
       2. 설치 프로그램의 기본 설치 위치
-      3. 애드온 설정의 RefBoard 소스 폴더 (개발용)"""
+      3. 애드온 설정의 MoRef 소스 폴더 (개발용)"""
     try:
         with open(os.path.join(_user_data(), "app-path.json"), encoding="utf8") as f:
             info = json.load(f)
         if os.path.isfile(info["exe"]):
-            return [info["exe"], *info.get("args", [])], "마지막으로 실행한 RefBoard"
+            return [info["exe"], *info.get("args", [])], "마지막으로 실행한 MoRef"
     except (OSError, ValueError, KeyError):
         pass
     local = os.environ.get("LOCALAPPDATA", "")
     for exe in (
-        os.path.join(local, "Programs", "RefBoard", "RefBoard.exe"),
-        os.path.join(local, "Programs", "refboard", "RefBoard.exe"),
-        os.path.join(os.environ.get("ProgramFiles", r"C:\Program Files"), "RefBoard", "RefBoard.exe"),
+        os.path.join(local, "Programs", "MoRef", "MoRef.exe"),
+        os.path.join(os.environ.get("ProgramFiles", r"C:\Program Files"), "MoRef", "MoRef.exe"),
+        os.path.join(local, "Programs", "RefBoard", "RefBoard.exe"),  # 이름을 바꾸기 전 설치판
     ):
         if os.path.isfile(exe):
-            return [exe], "설치된 RefBoard"
+            return [exe], "설치된 MoRef"
     root = bpy.path.abspath(_prefs().refboard_dir).rstrip("\\/")
     exe = os.path.join(root, "node_modules", "electron", "dist", "electron.exe" if IS_WIN else "electron")
     if root and os.path.isfile(exe):
         return [exe, root], "소스 폴더"
-    return None, "RefBoard 를 찾을 수 없습니다 - RefBoard 를 설치해서 한 번 실행하거나, 애드온 설정에서 소스 폴더를 지정하세요"
+    return None, "MoRef 를 찾을 수 없습니다 - MoRef 를 설치해서 한 번 실행하거나, 애드온 설정에서 소스 폴더를 지정하세요"
 
 
 def _link_file():
@@ -122,7 +123,7 @@ def _close_sock():
         try:
             _set_loop_range(None)  # 구간에 맞춰 바꾼 미리보기 범위를 원래대로
         except Exception as e:
-            print("RefBoard: 미리보기 범위 복원 실패", e)
+            print("MoRef: 미리보기 범위 복원 실패", e)
         _redraw_ui()
 
 
@@ -138,7 +139,7 @@ def _send(line):
 
 
 def _toast(text):
-    print("RefBoard:", text)
+    print("MoRef:", text)
     _send("toast " + text)
 
 
@@ -157,7 +158,7 @@ def _try_connect():
             info = json.load(f)
         sock = socket.create_connection(("127.0.0.1", int(info["port"])), timeout=0.3)
     except (OSError, ValueError, KeyError):
-        return  # RefBoard 가 꺼져 있다
+        return  # MoRef 가 꺼져 있다
     try:
         sock.sendall(f"auth {info['token']}\n".encode())
         sock.settimeout(0.05)  # Blender 가 멈추지 않도록 짧게
@@ -173,7 +174,7 @@ def _try_connect():
 
 
 def _poll_incoming():
-    """RefBoard 가 보낸 줄을 읽는다 (막히지 않게 select 로 확인만)"""
+    """MoRef 가 보낸 줄을 읽는다 (막히지 않게 select 로 확인만)"""
     if S.sock is None:
         return
     try:
@@ -184,7 +185,7 @@ def _poll_incoming():
     except OSError:
         data = b""
     if not data:
-        _close_sock()  # RefBoard 를 껐다
+        _close_sock()  # MoRef 를 껐다
         return
     S.rbuf += data
     while b"\n" in S.rbuf:
@@ -193,7 +194,7 @@ def _poll_incoming():
         try:
             _handle_line(line)
         except Exception as e:  # 한 줄이 잘못돼도 연결은 유지
-            print("RefBoard: 처리 실패", line[:80], e)
+            print("MoRef: 처리 실패", line[:80], e)
 
 
 def _handle_line(line):
@@ -249,7 +250,7 @@ def _active_window():
 
 
 def toggle_play():
-    """Blender 재생 켜기/끄기 (RefBoard 에서 타임라인에 맞춘 레퍼런스의 Space / 재생 버튼)"""
+    """Blender 재생 켜기/끄기 (MoRef 에서 타임라인에 맞춘 레퍼런스의 Space / 재생 버튼)"""
     w = _active_window()
     if w is None:
         return
@@ -261,7 +262,7 @@ def toggle_play():
 
 
 def _set_loop_range(r):
-    """RefBoard 반복 구간 → 씬 미리보기 범위. 처음 바꿀 때 원래 값을 기억했다가, 구간을 끄면 되돌린다"""
+    """MoRef 반복 구간 → 씬 미리보기 범위. 처음 바꿀 때 원래 값을 기억했다가, 구간을 끄면 되돌린다"""
     sc = bpy.context.scene
     if sc is None:
         return
@@ -298,8 +299,8 @@ def _set_loop_range(r):
 
 
 def _camera_bg(data):
-    """RefBoard 에서 보낸 영상을 활성 카메라의 배경 영상(무비 클립)으로 넣는다.
-    지금 RefBoard 에 보이는 프레임이 지금 Blender 프레임에 오도록 시작 프레임을 맞춘다
+    """MoRef 에서 보낸 영상을 활성 카메라의 배경 영상(무비 클립)으로 넣는다.
+    지금 MoRef 에 보이는 프레임이 지금 Blender 프레임에 오도록 시작 프레임을 맞춘다
     (Blender 타임라인에 맞추기를 켠 레퍼런스면 그 기준점으로)."""
     scene = bpy.context.scene
     cam = scene.camera if scene else None
@@ -363,8 +364,8 @@ def _same_file(a, b):
 
 
 def _viewport_ref(data):
-    """RefBoard 에서 보낸 영상을 이미지 Empty 로 띄운다. 같은 영상(같은 RefBoard 키)이면 그 Empty 를 다시 맞춘다.
-    어느 프레임을 보일지는 RefBoard 와 같은 식으로 매 프레임 계산한다 (_apply_ref_frames)."""
+    """MoRef 에서 보낸 영상을 이미지 Empty 로 띄운다. 같은 영상(같은 MoRef 키)이면 그 Empty 를 다시 맞춘다.
+    어느 프레임을 보일지는 MoRef 와 같은 식으로 매 프레임 계산한다 (_apply_ref_frames)."""
     scene = bpy.context.scene
     path = data["path"]
     if not os.path.isfile(path):
@@ -376,7 +377,7 @@ def _viewport_ref(data):
     if img is None:
         img = next((i for i in bpy.data.images if i.source == "MOVIE" and _same_file(i.filepath, path)), None) or bpy.data.images.load(path)
     if obj is None:
-        obj = bpy.data.objects.new("RefBoard · " + (data.get("name") or img.name), None)
+        obj = bpy.data.objects.new("MoRef · " + (data.get("name") or img.name), None)
         obj.empty_display_type = "IMAGE"
         scene.collection.objects.link(obj)
         obj["refboard_ref"] = 1
@@ -390,7 +391,7 @@ def _viewport_ref(data):
     iu = obj.image_user
     iu.frame_duration = max(1, img.frame_duration)
     iu.frame_offset = 0
-    iu.use_cyclic = False  # 반복은 _apply_ref_frames 가 RefBoard 와 같은 구간으로 한다
+    iu.use_cyclic = False  # 반복은 _apply_ref_frames 가 MoRef 와 같은 구간으로 한다
     iu.use_auto_refresh = True
     obj.scale.x = -abs(obj.scale.x) if data.get("flipX") else abs(obj.scale.x)
     _set_ref_map(obj, data["map"])
@@ -398,7 +399,7 @@ def _viewport_ref(data):
 
 
 def _set_ref_map(obj, m):
-    """RefBoard 와 같은 대응: 영상 시각 t = t0 + (Blender 프레임 − b0) / 씬 fps × 재생 속도, 구간 [a, b) 안에서 반복"""
+    """MoRef 와 같은 대응: 영상 시각 t = t0 + (Blender 프레임 − b0) / 씬 fps × 재생 속도, 구간 [a, b) 안에서 반복"""
     obj["refboard_map"] = json.dumps(m)
     _apply_ref_frames(bpy.context.scene)
 
@@ -435,7 +436,7 @@ def _apply_ref_frames(scene=None, _depsgraph=None):
 
 
 def _update_ref_map(data):
-    """RefBoard 에서 맞추기 기준 / 구간 / 속도를 바꿨을 때"""
+    """MoRef 에서 맞추기 기준 / 구간 / 속도를 바꿨을 때"""
     for o in _ref_objects():
         if o.get("refboard_key") == data.get("key"):
             _set_ref_map(o, data["map"])
@@ -491,7 +492,7 @@ def _tick():
             _poll_incoming()
             _send_timeline()  # 재생 시작/정지, fps 변경은 프레임 변경 없이도 일어난다
     except Exception as e:
-        print("RefBoard 연결 오류:", e)
+        print("MoRef 연결 오류:", e)
     return TICK
 
 
@@ -524,8 +525,8 @@ def _status_text():
 
 class REFBOARD_OT_open(bpy.types.Operator):
     bl_idname = "refboard.open"
-    bl_label = "RefBoard 열기"
-    bl_description = "RefBoard 가 꺼져 있으면 켜고, 켜져 있으면 앞으로 가져옵니다"
+    bl_label = "MoRef 열기"
+    bl_description = "MoRef 가 꺼져 있으면 켜고, 켜져 있으면 앞으로 가져옵니다"
 
     def execute(self, context):
         if _connected():
@@ -537,28 +538,28 @@ class REFBOARD_OT_open(bpy.types.Operator):
             return {"CANCELLED"}
         flags = 0
         if IS_WIN:
-            flags = subprocess.DETACHED_PROCESS | subprocess.CREATE_NEW_PROCESS_GROUP  # Blender 를 꺼도 RefBoard 는 남는다
+            flags = subprocess.DETACHED_PROCESS | subprocess.CREATE_NEW_PROCESS_GROUP  # Blender 를 꺼도 MoRef 는 남는다
         subprocess.Popen(cmd, cwd=os.path.dirname(cmd[0]), stdin=subprocess.DEVNULL, stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL, creationflags=flags, close_fds=True)
         S.launched_at = time.monotonic()
         S.next_try = 0.0
-        self.report({"INFO"}, "RefBoard 를 여는 중… 켜지면 자동으로 연결됩니다")
+        self.report({"INFO"}, "MoRef 를 여는 중… 켜지면 자동으로 연결됩니다")
         _redraw_ui()
         return {"FINISHED"}
 
 
 class REFBOARD_PT_sidebar(bpy.types.Panel):
     bl_idname = "REFBOARD_PT_sidebar"
-    bl_label = "RefBoard"
+    bl_label = "MoRef"
     bl_space_type = "VIEW_3D"
     bl_region_type = "UI"
-    bl_category = "RefBoard"
+    bl_category = "MoRef"
 
     def draw(self, context):
         layout = self.layout
         layout.label(text="상태: " + _status_text(), icon="LINKED" if _connected() else "UNLINKED")
         row = layout.row()
         row.scale_y = 1.3
-        row.operator(REFBOARD_OT_open.bl_idname, text="RefBoard 앞으로" if _connected() else "RefBoard 열기", icon="IMAGE_REFERENCE")
+        row.operator(REFBOARD_OT_open.bl_idname, text="MoRef 앞으로" if _connected() else "MoRef 열기", icon="IMAGE_REFERENCE")
         refs = _ref_objects()
         if refs:
             box = layout.box()
@@ -566,17 +567,17 @@ class REFBOARD_PT_sidebar(bpy.types.Panel):
             for o in refs:
                 col = box.column(align=True)
                 row = col.row(align=True)
-                row.label(text=o.name.replace("RefBoard · ", ""))
+                row.label(text=o.name.replace("MoRef · ", "").replace("RefBoard · ", ""))
                 row.operator(REFBOARD_OT_ref_remove.bl_idname, text="", icon="X").name = o.name
                 col.prop(o, "empty_display_size", text="크기")
                 col.prop(o, "color", index=3, text="불투명도", slider=True)
         col = layout.column(align=True)
         col.label(text="영상 우클릭 ▸ Blender 뷰포트에 띄우기")
-        col.label(text="RefBoard 영상의 🔗: 타임라인에 맞추기")
+        col.label(text="MoRef 영상의 🔗: 타임라인에 맞추기")
         col.label(text="맞춘 영상의 반복 구간 → Blender 도 반복")
         col.label(text="맞춘 영상에서 Space → Blender 재생")
         col.label(text="영상 우클릭 ▸ 카메라 배경으로 보내기")
-        layout.label(text="Ctrl+Alt+R: RefBoard 열기 / 앞으로", icon="EVENT_R")
+        layout.label(text="Ctrl+Alt+R: MoRef 열기 / 앞으로", icon="EVENT_R")
 
 
 def _topbar(self, context):
@@ -587,7 +588,7 @@ def _topbar(self, context):
             return
     except KeyError:
         return
-    self.layout.operator(REFBOARD_OT_open.bl_idname, text="RefBoard", icon="LINKED" if _connected() else "UNLINKED", depress=_connected())
+    self.layout.operator(REFBOARD_OT_open.bl_idname, text="MoRef", icon="LINKED" if _connected() else "UNLINKED", depress=_connected())
 
 
 class REFBOARD_Prefs(bpy.types.AddonPreferences):
@@ -595,13 +596,13 @@ class REFBOARD_Prefs(bpy.types.AddonPreferences):
 
     refboard_dir: bpy.props.StringProperty(
         name="소스 폴더 (개발용)",
-        description="설치하지 않고 소스로 실행할 때만: RefBoard 프로젝트 폴더 (package.json 과 node_modules 가 있는 곳)",
+        description="설치하지 않고 소스로 실행할 때만: MoRef 프로젝트 폴더 (package.json 과 node_modules 가 있는 곳)",
         subtype="DIR_PATH",
-        default=os.path.join(os.path.expanduser("~"), "Desktop", "RefBoard"),
+        default=os.path.join(os.path.expanduser("~"), "Desktop", "MoRef"),
     )
     topbar_button: bpy.props.BoolProperty(
-        name="상단 바에 RefBoard 버튼",
-        description="Blender 상단 바 오른쪽에 연결 상태와 RefBoard 열기 버튼을 둡니다",
+        name="상단 바에 MoRef 버튼",
+        description="Blender 상단 바 오른쪽에 연결 상태와 MoRef 열기 버튼을 둡니다",
         default=True,
     )
 
@@ -609,7 +610,7 @@ class REFBOARD_Prefs(bpy.types.AddonPreferences):
         layout = self.layout
         cmd, where = _find_refboard()
         if cmd:
-            layout.label(text=f"RefBoard 를 찾았습니다 ({where}): {cmd[0]}", icon="CHECKMARK")
+            layout.label(text=f"MoRef 를 찾았습니다 ({where}): {cmd[0]}", icon="CHECKMARK")
         else:
             layout.label(text=where, icon="ERROR")
         layout.prop(self, "refboard_dir")
