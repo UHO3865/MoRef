@@ -23,6 +23,31 @@ function onionCounts(v) {
   const r = { b: clamp(c.b), a: clamp(c.a) };
   return r.b || r.a ? r : null;
 }
+// 앞뒤 프레임마다 색 (설정 onionColors = { b: ['#rrggbb', …], a: […] }, 거리 1 이 0번). 비어 있으면 기본색
+const ONION_BASE = { b: ONION_BEFORE, a: ONION_AFTER };
+const hexRgb = (s) => [1, 3, 5].map((i) => parseInt(s.slice(i, i + 2), 16));
+const rgbHex = (c) => '#' + c.map((v) => v.toString(16).padStart(2, '0')).join('');
+function onionColor(side, d) {
+  const s = app.settings.onionColors?.[side]?.[d - 1];
+  return /^#[0-9a-f]{6}$/i.test(s || '') ? hexRgb(s) : ONION_BASE[side];
+}
+let onionColorSave = 0;
+function setOnionColor(side, d, hex) {
+  const c = { b: [...(app.settings.onionColors?.b || [])], a: [...(app.settings.onionColors?.a || [])] };
+  if (hex) c[side][d - 1] = hex;
+  else c[side] = []; // 기본색으로
+  app.settings.onionColors = c;
+  clearTimeout(onionColorSave);
+  onionColorSave = setTimeout(() => rb.setSetting('onionColors', app.settings.onionColors), 300); // 고르는 동안 계속 바뀐다
+  // 켜져 있는 모든 영상에 바로
+  for (const it of app.items.values()) {
+    if (!it.onion) continue;
+    it.onionKey = null;
+    renderShapes(it);
+    updateOnionMenu(it);
+  }
+}
+
 // 새로 켤 때는 마지막으로 쓴 값 (설정에 기억)
 const onionDefault = () => onionCounts(app.settings.onionDefault) || { b: 2, a: 2 };
 // 영상마다 기억해 둘 프레임: 보이는 것 + 한 칸씩 넘길 때 다시 쓰는 것
@@ -77,29 +102,62 @@ function buildOnionMenu(it, bar) {
     minus.onclick = (e) => (e.stopPropagation(), change(-1));
     plus.onclick = (e) => (e.stopPropagation(), change(1));
     r.onwheel = (e) => (e.preventDefault(), e.stopPropagation(), change(e.deltaY < 0 ? 1 : -1));
-    r.append(h('span', 'om-dot'), h('span', 'om-label', label), minus, val, plus);
-    m.append(r);
-    return val;
+    const dot = h('span', 'om-dot');
+    r.append(dot, h('span', 'om-label', label), minus, val, plus);
+    // 그 아래: 프레임마다 색 (누르면 색 고르기)
+    const strip = h('div', 'om-colors ' + cls);
+    m.append(r, strip);
+    return { val, dot, strip };
   };
-  it.ctl.onionB = row(tr('이전 (초록)'), 'b', 'before');
-  it.ctl.onionA = row(tr('다음 (파랑)'), 'a', 'after');
+  it.ctl.onionRows = { b: row(tr('이전'), 'b', 'before'), a: row(tr('다음'), 'a', 'after') };
+  const foot = h('div', 'om-foot');
+  const reset = h('button', 'om-reset', tr('기본 색으로'));
+  reset.onclick = (e) => {
+    e.stopPropagation();
+    setOnionColor('b', 0, null);
+    setOnionColor('a', 0, null);
+  };
   const off = h('button', 'om-off', tr('끄기'));
   off.onclick = (e) => {
     e.stopPropagation();
     setOnion(it, 0);
     closeMenus();
   };
-  m.append(off);
+  foot.append(reset, off);
+  m.append(foot);
   it.ctl.onionMenu = m;
   bar.append(m);
   updateOnionMenu(it);
 }
 
 function updateOnionMenu(it) {
-  if (!it.ctl?.onionB) return;
+  const rows = it.ctl?.onionRows;
+  if (!rows) return;
   const c = it.onion || onionDefault();
-  it.ctl.onionB.textContent = c.b;
-  it.ctl.onionA.textContent = c.a;
+  for (const side of ['b', 'a']) {
+    const { val, dot, strip } = rows[side];
+    val.textContent = c[side];
+    dot.style.background = rgbHex(onionColor(side, 1));
+    // 거리마다 색 칸: 이전은 먼 것(-n)부터 왼쪽에, 다음은 가까운 것(+1)부터
+    const ds = Array.from({ length: c[side] }, (_, i) => i + 1);
+    if (side === 'b') ds.reverse();
+    const want = ds.map((d) => `${d}:${rgbHex(onionColor(side, d))}`).join(' ');
+    if (strip.dataset.v === want) continue; // 고르는 중인 색 입력칸을 다시 만들지 않게
+    strip.dataset.v = want;
+    strip.replaceChildren(
+      ...ds.map((d) => {
+        const sw = h('label', 'om-sw');
+        sw.title = tr('{0} 프레임 색', (side === 'b' ? '-' : '+') + d);
+        const input = h('input');
+        input.type = 'color';
+        input.value = rgbHex(onionColor(side, d));
+        input.oninput = () => setOnionColor(side, d, input.value);
+        input.onclick = (e) => e.stopPropagation();
+        sw.append(input, h('span', '', (side === 'b' ? '-' : '+') + d));
+        return sw;
+      }),
+    );
+  }
 }
 
 // 어니언 버튼: 꺼져 있으면 켜고, 켜져 있으면 프레임 수 고르기를 열고 닫는다
@@ -206,7 +264,7 @@ async function renderOnion(it, f, gen) {
     const bmp = await onionFrame(it, i, W, H);
     if (gen !== it.onionGen) return;
     if (!bmp) continue;
-    const g = { bmp, tint: dir < 0 ? ONION_BEFORE : ONION_AFTER, alpha: 0.75 * (1 - (d - 1) / (n + 1)) };
+    const g = { bmp, tint: onionColor(dir < 0 ? 'b' : 'a', d), alpha: 0.75 * (1 - (d - 1) / (n + 1)) };
     if (gpu) {
       ghosts.push(g);
       if (!blendGpu(gpu, cur, ghosts, W, H)) return; // 영상 프레임을 올리지 못함 (아주 드묾): 다음에
@@ -222,7 +280,9 @@ async function renderOnion(it, f, gen) {
 
 /* ---------- GPU 로 합치기 (WebGL 하나를 모든 영상이 같이 쓴다) ---------- */
 
-const ONION_VS = 'attribute vec2 p; varying vec2 uv; void main() { uv = (p + 1.0) * 0.5; gl_Position = vec4(p, 0.0, 1.0); }';
+// 위아래는 셰이더에서 뒤집는다: UNPACK_FLIP_Y 는 <video> 에는 듣지만 ImageBitmap(앞뒤 프레임)에는 듣지 않아서
+// 그것을 쓰면 앞뒤 프레임만 상하가 뒤집혀 겹쳤다 (같은 프레임끼리도 전부 "다르다"로 칠해짐)
+const ONION_VS = 'attribute vec2 p; varying vec2 uv; void main() { uv = vec2((p.x + 1.0) * 0.5, (1.0 - p.y) * 0.5); gl_Position = vec4(p, 0.0, 1.0); }';
 // blendGhost 와 같은 계산: 지금 프레임과 다른 곳만 그 프레임 색 20% + 이전(초록) / 다음(파랑) 색 80%
 const ONION_FS = `precision mediump float;
 uniform sampler2D cur; uniform sampler2D gh; uniform vec3 tint; uniform float alpha; uniform float diff;
@@ -275,7 +335,6 @@ function onionGl() {
     gl.uniform1i(gl.getUniformLocation(prog, 'cur'), 0);
     gl.uniform1i(gl.getUniformLocation(prog, 'gh'), 1);
     gl.uniform1f(gl.getUniformLocation(prog, 'diff'), ONION_DIFF);
-    gl.pixelStorei(gl.UNPACK_FLIP_Y_WEBGL, true);
     gl.enable(gl.BLEND);
     gl.blendFunc(gl.ONE, gl.ONE_MINUS_SRC_ALPHA); // 미리 곱한 알파로 겹치기
     onionGlState = { gl, canvas, texCur, texGh, uTint: gl.getUniformLocation(prog, 'tint'), uAlpha: gl.getUniformLocation(prog, 'alpha') };

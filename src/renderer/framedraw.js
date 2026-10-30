@@ -1,5 +1,5 @@
 'use strict';
-/* global app, rb, $, tr, toast, icon, isTimed, currentFrame, shapeEl, renderShapes, applyVisual, markDirty, ONION_BEFORE, ONION_AFTER */
+/* global app, rb, $, tr, toast, icon, isTimed, currentFrame, shapeEl, renderShapes, applyVisual, markDirty, onionColor */
 // 프레임별 그리기 / 배경 (그림만 보기)
 //
 // 프레임별 그리기 (그리기 막대의 필름 버튼): 켜고 그린 선은 그때의 프레임에만 보인다 (도형의 f = 프레임 번호).
@@ -37,7 +37,7 @@ function shapeNodes(it) {
       const d = s.f - cur;
       const n = d < 0 ? it.onion.b : it.onion.a;
       if (Math.abs(d) > n) continue;
-      ghosts.push({ s, d: Math.abs(d), n, tint: d < 0 ? ONION_BEFORE : ONION_AFTER });
+      ghosts.push({ s, d: Math.abs(d), n, tint: onionColor(d < 0 ? 'b' : 'a', Math.abs(d)) });
     }
     ghosts.sort((x, y) => y.d - x.d);
     for (const g of ghosts) {

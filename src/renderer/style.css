@@ -1494,12 +1494,10 @@ body.lib-mode .panel-head, body.lib-mode .panel-nav, body.lib-mode #filter, body
 .ctl .onion-menu .om-row { display: flex; align-items: center; gap: 6px; padding: 2px 4px; border-radius: 6px; }
 .ctl .onion-menu .om-row:hover { background: #ffffff0d; }
 .ctl .onion-menu .om-dot { width: 8px; height: 8px; border-radius: 50%; flex: none; }
-.ctl .onion-menu .before .om-dot { background: rgb(60, 220, 110); }
-.ctl .onion-menu .after .om-dot { background: rgb(80, 150, 255); }
 .ctl .onion-menu .om-label { flex: 1; font-size: 12px; white-space: nowrap; }
 .ctl .onion-menu .om-step { width: 24px; height: 22px; padding: 0; text-align: center; font-size: 14px; line-height: 1; }
 .ctl .onion-menu .om-val { min-width: 18px; text-align: center; font-variant-numeric: tabular-nums; }
-.ctl .onion-menu .om-off { margin-top: 4px; text-align: center; color: var(--fg2); }
+.ctl .onion-menu .om-off { text-align: center; color: var(--fg2); }
 /* 어니언 스킨의 옆 프레임을 읽는 숨은 영상: 문서 안에 있어야 프레임 시점을 받는다 (display:none 이면 안 됨) */
 .onion-helper { position: fixed; left: 0; top: 0; width: 2px; height: 2px; opacity: 0; pointer-events: none; z-index: -1; }
 
@@ -1510,3 +1508,12 @@ body.lib-mode .panel-head, body.lib-mode .panel-nav, body.lib-mode #filter, body
 .ibar.top .fbadge { margin-left: 6px; padding: 1px 7px; border-radius: 999px; background: var(--accent); color: #fff; font-size: 11px; font-variant-numeric: tabular-nums; white-space: nowrap; }
 .ibar.top .fbadge[hidden] { display: none; }
 .draw-bar #btnPerFrame.on, .draw-bar #btnBg.on { background: #4ea1ff2e; color: var(--accent); box-shadow: inset 0 0 0 1px #4ea1ff80; }
+/* 어니언 스킨: 앞뒤 프레임마다 색 (onion.js) */
+.ctl .onion-menu .om-colors { display: flex; flex-wrap: wrap; gap: 3px 4px; padding: 0 4px 6px 18px; }
+.ctl .onion-menu .om-colors:empty { display: none; }
+.ctl .onion-menu .om-sw { display: flex; flex-direction: column; align-items: center; gap: 1px; font-size: 9px; color: var(--fg2); cursor: pointer; font-variant-numeric: tabular-nums; }
+.ctl .onion-menu .om-sw input[type='color'] { width: 18px; height: 18px; padding: 0; border: 0; border-radius: 50%; background: none; cursor: pointer; }
+.ctl .onion-menu .om-sw input[type='color']::-webkit-color-swatch-wrapper { padding: 0; }
+.ctl .onion-menu .om-sw input[type='color']::-webkit-color-swatch { border: 1px solid #ffffff40; border-radius: 50%; }
+.ctl .onion-menu .om-foot { display: flex; gap: 4px; margin-top: 4px; }
+.ctl .onion-menu .om-foot button { flex: 1; text-align: center; color: var(--fg2); padding: 4px 6px; }

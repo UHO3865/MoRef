@@ -584,6 +584,8 @@ async function run(win) {
       await js(`toggleOnion(${V}); 1`);
       await wait(1500);
       log('onion: video', await ghost(V));
+      // GPU 로 합칠 때 위아래가 맞는지: 같은 프레임끼리 합치면 다른 곳이 없어야 한다 (뒤집히면 화면 대부분이 칠해진다)
+      log('onion: same frame on GPU, differing px (expect 0)', await js(`(async () => { const v = (${V}).media; const st = onionGl(); if (!st) return 'no webgl'; const W = 320, H = 180; const bmp = await shrink(v, W, H); blendGpu(st, v, [{ bmp, tint: [255, 0, 0], alpha: 1 }], W, H); const c = document.createElement('canvas'); c.width = W; c.height = H; const g = c.getContext('2d'); g.drawImage(st.canvas, 0, 0); const d = g.getImageData(0, 0, W, H).data; let n = 0; for (let i = 3; i < d.length; i += 4) if (d[i] > 10) n++; bmp.close(); return n; })()`));
       await js(`toggleOnion(${V}); 1`);
       // (자르기 점검에서 보드를 다시 불러와 항목이 새로 만들어졌다: 보드에서 찾는다)
       const GIF = `[...RB.app.items.values()].find(i => i.kind === 'gif')`;
