@@ -325,6 +325,16 @@ async function run(win) {
       await shot('15-gif-frame3');
     }
 
+    // ---- 4MB 넘는 GIF: 프록시가 범위 없는 요청에도 파일 끝까지 보내는지 (GIF 플레이어 · 미리 보기는 다시 요청하지 않는다) ----
+    {
+      const r = await js(`(async () => { const l = await rb.source.list(RB.app.sourceId, 'thumbtest'); const e = (l.entries || []).find((x) => x.name === 'big.gif'); if (!e) return 'skipped (no thumbtest/big.gif)';
+        const res = await fetch(await mediaUrl({ sourceId: RB.app.sourceId, path: e.path })); const n = (await res.arrayBuffer()).byteLength;
+        const it = await RB.addItem({ kind: 'gif', ref: { sourceId: RB.app.sourceId, path: e.path }, name: e.name, x: 20000, y: 0, paused: true });
+        for (let i = 0; i < 60 && !it.media.complete && !it.media.error; i++) await new Promise((r) => setTimeout(r, 250));
+        const out = { size: e.size, got: n, frames: it.media.frameCount, complete: it.media.complete, error: it.media.error?.message || null }; RB.removeItem(it); return JSON.stringify(out); })()`);
+      log('big gif (>4MB) whole file', r);
+    }
+
     // ---- 실제 프레임 레이트: 화면에 나온 프레임 == 프레임 번호 표시 (실제 키 입력) ----
     // 테스트 영상은 프레임 n 의 밝기가 Y = 16 + 7·(n mod 30) → 화면 회색값 ≈ 8.15·(n mod 30)
     {
