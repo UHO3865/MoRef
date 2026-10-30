@@ -94,6 +94,10 @@ const ICONS = {
   crop: '<path d="M6.5 2.5v15h15"/><path d="M2.5 6.5h15v15"/>',
   frames: '<rect x="3.5" y="3.5" width="7" height="7" rx="1.3"/><rect x="13.5" y="3.5" width="7" height="7" rx="1.3"/><rect x="3.5" y="13.5" width="7" height="7" rx="1.3"/><rect x="13.5" y="13.5" width="7" height="7" rx="1.3"/>',
   folder: '<path d="M3.5 7.5a2 2 0 0 1 2-2h3.6l2 2.2h7.4a2 2 0 0 1 2 2v7.8a2 2 0 0 1-2 2h-13a2 2 0 0 1-2-2z"/>',
+  perFrame: '<rect x="3.5" y="5" width="17" height="14" rx="2"/><path d="M3.5 9h17M3.5 15h17M8 5v4M16 5v4M8 15v4M16 15v4"/><path d="M10 12.5l1.6-1.6 2.4 2.4" stroke-width="1.6"/>',
+  bgShown: '<rect x="3.5" y="5" width="17" height="14" rx="2"/><path d="M7 15.5c2-4 3.5 1 5.5-2.5s3-2 4.5-3"/>',
+  bgHidden: '<rect x="3.5" y="5" width="17" height="14" rx="2" stroke-dasharray="2.6 2.4"/><path d="M7 15.5c2-4 3.5 1 5.5-2.5s3-2 4.5-3"/>',
+  onion: '<circle cx="7.5" cy="12" r="4.5" opacity=".4"/><circle cx="12" cy="12" r="4.5" opacity=".7"/><circle cx="16.5" cy="12" r="4.5"/>',
   image: '<rect x="3.5" y="5" width="17" height="14" rx="2"/><circle cx="9" cy="10" r="1.6"/><path d="M20.5 15.5 15 10l-8 9"/>',
   target: '<circle cx="12" cy="12" r="7.5"/><circle cx="12" cy="12" r="2.5" fill="currentColor" stroke="none"/><path d="M12 1.8v3M12 19.2v3M1.8 12h3M19.2 12h3"/>',
   plus: '<path d="M12 5v14M5 12h14"/>',
@@ -1007,6 +1011,7 @@ async function addItem(opts) {
     flipH: !!opts.flipH,
     flipV: !!opts.flipV,
     gray: !!opts.gray,
+    hideMedia: !!opts.hideMedia, // 영상을 숨기고 그림만 (framedraw.js)
     crop: opts.crop || null,
     sync: opts.sync || null, // Blender 타임라인 기준점 { b0, t0 }
   };
@@ -1017,6 +1022,7 @@ async function addItem(opts) {
     it.y -= it.h / 2;
   }
   buildItemEl(it);
+  if (opts.onion) setOnion(it, opts.onion, { remember: false });
   app.items.set(it.id, it);
   boardChanged(it, 1);
   layoutAll();
@@ -1109,6 +1115,7 @@ function buildItemEl(it) {
       showError(it, code === 4 ? tr('재생할 수 없는 형식/코덱입니다') : tr('NAS에서 영상을 읽지 못했습니다 (연결 확인)'));
     };
     v.onplay = v.onpause = () => updatePlayBtn(it);
+    for (const ev of ['seeking', 'seeked', 'loadeddata', 'durationchange', 'progress', 'ratechange']) v.addEventListener(ev, wakeTick);
     v.addEventListener('loadstart', () => (it.hasFrame = false));
     v.addEventListener('loadeddata', () => (it.hasFrame = true));
     it.media = v;
@@ -1147,7 +1154,9 @@ function buildItemEl(it) {
   const top = h('div', 'ibar top');
   top.append(h('span', 'nm', it.name));
   it.badges = h('span', 'vbadges');
-  top.append(it.badges);
+  it.frameBadge = h('span', 'fbadge'); // 프레임별 그리기 중 지금 프레임 (framedraw.js)
+  it.frameBadge.hidden = true;
+  top.append(it.badges, it.frameBadge);
   const close = h('button', 'close');
   close.innerHTML = icon('x');
   close.title = tr('닫기 (Delete)');
@@ -1336,12 +1345,14 @@ function buildControls(it) {
     changeSpeed(it, e.deltaY < 0 ? 1 : -1);
   };
   row.append(c.speed);
+  c.onion = btn('onion', tr('어니언 스킨 - 멈췄을 때 이전 · 다음 프레임 겹쳐 보기 (K) · 켜져 있으면 눌러서 프레임 수'), () => onionButton(it), 'onionbtn');
   c.sync = btn('link', '', () => toggleSync(it), 'sync'); // Blender 와 연결됐을 때만 보인다 (CSS)
   if (it.kind === 'gif') c.frames = btn('frames', tr('모든 프레임 보기 (G) - 프레임을 누르면 그 프레임으로'), () => toggleFrames(it), 'framesbtn');
   else c.mute = btn('mute', tr('소리 켜기 / 끄기 (M)'), () => toggleMute(it), 'mutebtn');
 
   c.strip = h('div', 'segstrip');
   bar.append(scrub, row, c.strip, c.menu);
+  buildOnionMenu(it, bar);
   updateSpeedBtn(it);
   updateLoopUi(it);
   queueMicrotask(() => renderSegments(it));
@@ -1367,7 +1378,8 @@ function updateFpsUi(it) {
 }
 
 function updatePlayBtn(it) {
-  if (!it.ctl) return;
+  wakeTick(); // 재생 / 멈춤 (영상 · GIF)
+  if (!it.ctl || it.playStep) return; // → 한 칸을 재생으로 넘기는 중: 재생 버튼은 그대로
   const paused = it.media.paused;
   it.ctl.play.innerHTML = icon(paused ? 'play' : 'pause');
   it.el.classList.toggle('paused', paused);
@@ -1408,14 +1420,60 @@ function step(it, dt) {
     it.media.stepFrame(dt > 0 ? 1 : -1);
     return realignSync(it);
   }
-  it.media.pause();
   if (it.kind === 'video') {
     const n = Math.abs(dt) < 0.5 ? Math.sign(dt) : Math.round(dt * fpsOf(it));
+    if (n === 1 && stepByPlay(it)) return;
+    it.media.pause();
     seekFrame(it, currentFrame(it) + n);
     return realignSync(it);
   }
+  it.media.pause();
   it.media.currentTime = Math.max(0, Math.min(it.media.duration || 0, it.media.currentTime + dt));
 }
+// → 한 칸: 이동(seek)하면 Chromium 은 앞 키프레임부터 다시 풀고, 큰 영상은 그만큼을 NAS 에서 다시 받는다
+// (4K 40Mbps · 키프레임 10초 간격: 한 번에 0.6~0.9초, 10~30MB). 다음 프레임은 이미 받아 둔 바로 뒤라서
+// 잠깐 재생했다가 다음 프레임이 화면에 나오면 멈춘다. 빨리 여러 번 누르면 목표만 늘린다.
+// 쓸 수 없으면 false (멈춰 있지 않음 · 이동 중 · 아직 못 받음 · 끝) → 이동으로
+const STEP_RATE = 0.5;
+function stepByPlay(it) {
+  const v = it.media;
+  if (it.playStep) {
+    it.playStep.target = Math.min(it.playStep.target + 1, totalFrames(it) - 1);
+    return true;
+  }
+  if (!v.paused || v.seeking || it.pendingSeek != null || v.readyState < 3 || it.unloaded || !('requestVideoFrameCallback' in v)) return false;
+  const target = currentFrame(it) + 1;
+  const fps = fpsOf(it);
+  if (target >= totalFrames(it)) return false;
+  if (it.b != null && (target + 1) / fps > it.b) return false; // 반복 구간 끝을 넘으면 tick() 이 처음으로 되돌린다
+  const st = (it.playStep = { target, rate: v.playbackRate });
+  const finish = (ok) => {
+    clearTimeout(st.timer);
+    v.pause();
+    v.playbackRate = st.rate;
+    it.playStep = null;
+    updatePlayBtn(it);
+    if (!ok) seekFrame(it, st.target);
+    realignSync(it, (st.target + 0.5) / fps);
+  };
+  const arm = () => {
+    clearTimeout(st.timer);
+    st.timer = setTimeout(() => finish(false), 1500); // 다음 프레임이 안 나오면 (받는 중 등) 이동으로
+  };
+  const onFrame = (_now, meta) => {
+    if (it.playStep !== st) return;
+    const i = Math.floor(meta.mediaTime * fps + 0.01);
+    if (i >= st.target) return finish(i === st.target);
+    arm();
+    v.requestVideoFrameCallback(onFrame);
+  };
+  arm();
+  v.requestVideoFrameCallback(onFrame);
+  v.playbackRate = STEP_RATE;
+  v.play().catch(() => finish(false));
+  return true;
+}
+
 function changeSpeed(it, dir) {
   if (!isTimed(it)) return;
   let i = SPEEDS.indexOf(it.rate);
@@ -1459,6 +1517,7 @@ function removeItem(it) {
     it.media.destroy();
   }
   clearTimeout(it.hoverTimer);
+  closeOnion(it);
   releaseMedia(it);
   if (app.cropping === it) app.cropping = null;
   it.ctlEl?.remove();
@@ -1494,15 +1553,41 @@ function select(it, additive) {
     if (it.ctlEl) it.ctlEl.style.zIndex = it.z;
     refreshCtl(it);
   }
+  if (app.draw.on) updateDrawExtrasUi(); // 배경 버튼은 고른 영상의 상태를 보여 준다
 }
 
-// 반복 구간 / 진행 바 갱신
+// 반복 구간 / 진행 바 갱신.
+// 무언가 움직이는 동안(재생 · 이동 중)만 매 화면 돈다. 모두 멈춰 있으면 1초에 4번만 (대기 중에 CPU / GPU 를 쓰지 않게).
+// 재생 · 이동 · 입력이 생기면 wakeTick() 으로 바로 다시 매 화면으로
+const TICK_IDLE_MS = 250;
+let tickRaf = 0;
+let tickTimer = 0;
+function wakeTick() {
+  if (tickRaf) return;
+  clearTimeout(tickTimer);
+  tickTimer = 0;
+  tickRaf = requestAnimationFrame(tick);
+}
+// 값이 바뀔 때만 쓴다 (같은 값을 매 화면 써도 스타일 계산이 다시 돈다)
+function setStyle(el, k, v) {
+  const c = (el._st ??= {});
+  if (c[k] === v) return;
+  c[k] = v;
+  el.style[k] = v;
+}
+
 function tick() {
+  tickRaf = 0;
+  let busy = false;
   updateBlenderRange();
   for (const it of app.items.values()) {
     if (!isTimed(it)) continue;
     const v = it.media;
     const d = durOf(it);
+    if (!v.paused || v.seeking || it.pendingSeek != null) busy = true;
+    if (it.onion) onionTick(it);
+    if (it.shapeFrame != null) frameShapesTick(it);
+    if (app.draw.on) updateFrameBadge(it);
     // 연속 seek 중 멈춰 버리는 경우(webm 등)가 있어, 오래 걸리면 seek 을 다시 건다.
     // 처음 받는 중(첫 프레임 전)에는 걸지 않고, 다시 걸 때마다 기다리는 시간을 두 배로: 여러 영상을 동시에
     // 처음부터 받으며 이동하면 몇 초씩 걸리는데, 그때 다시 걸면 끝나지 못하고 계속 처음부터 이동한다.
@@ -1526,8 +1611,8 @@ function tick() {
     const c = it.ctl;
     const pct = (x) => (x / d) * 100 + '%';
     const t = v.currentTime;
-    c.fill.style.width = pct(t);
-    c.knob.style.left = pct(t);
+    setStyle(c.fill, 'width', pct(t));
+    setStyle(c.knob, 'left', pct(t));
     const cur = fmtTime(t);
     if (c.cur.textContent !== cur) c.cur.textContent = cur;
     const total = ' / ' + fmtTime(d);
@@ -1548,9 +1633,14 @@ function tick() {
     for (let i = 0; i < v.buffered.length; i++) {
       if (v.buffered.start(i) <= t + 0.1) bufEnd = Math.max(bufEnd, v.buffered.end(i));
     }
-    c.buf.style.width = pct(bufEnd);
+    setStyle(c.buf, 'width', pct(bufEnd));
   }
-  requestAnimationFrame(tick);
+  if (tickRaf) return; // 도는 중에 wakeTick() 이 이미 다음 화면을 잡았다 (두 줄로 돌지 않게)
+  if (busy) tickRaf = requestAnimationFrame(tick);
+  else {
+    clearTimeout(tickTimer);
+    tickTimer = setTimeout(wakeTick, TICK_IDLE_MS);
+  }
 }
 
 // ---------- 우클릭 메뉴 ----------
@@ -1695,6 +1785,8 @@ function itemMenu(ev, it) {
     items.push({ label: v.paused ? tr('재생') : tr('일시정지'), icon: v.paused ? 'play' : 'pause', hint: 'Space', action: () => togglePlay(it) });
     if (it.kind === 'gif') items.push({ label: v.grid ? tr('모든 프레임 보기 끄기') : tr('모든 프레임 보기'), icon: 'frames', hint: 'G', action: () => toggleFrames(it) });
     else items.push({ label: it.muted ? tr('소리 켜기') : tr('소리 끄기'), icon: it.muted ? 'vol' : 'mute', hint: 'M', action: () => toggleMute(it) });
+    items.push({ label: tr('어니언 스킨 (앞뒤 프레임 겹쳐 보기)'), icon: 'onion', hint: 'K', checked: !!it.onion, action: () => toggleOnion(it) });
+    items.push({ label: it.onion ? tr('어니언 스킨 프레임 수… (이전 {0} · 다음 {1})', it.onion.b, it.onion.a) : tr('어니언 스킨 프레임 수…'), icon: 'onion', action: () => openOnionMenu(it) });
     items.push('sep');
   }
   if (app.linked && isTimed(it)) {
@@ -1709,6 +1801,7 @@ function itemMenu(ev, it) {
   items.push({ label: tr('좌우 반전'), icon: 'mirror', hint: 'Shift+H', checked: it.flipH, action: () => toggleFlip(it, 'flipH') });
   items.push({ label: tr('상하 반전'), icon: 'flipV', hint: 'Shift+V', checked: it.flipV, action: () => toggleFlip(it, 'flipV') });
   items.push({ label: tr('흑백'), icon: 'gray', hint: 'Shift+G', checked: it.gray, action: () => toggleGray(it) });
+  items.push({ label: tr('영상 숨기기 (그림만 보기)'), icon: 'bgHidden', hint: 'B', checked: !!it.hideMedia, action: () => toggleHideMedia(it) });
   items.push({ label: tr('자르기…'), icon: 'crop', hint: 'C', action: () => startCrop(it) });
   if (it.crop) items.push({ label: tr('자르기 해제'), icon: 'undo', action: () => resetCrop(it) });
   items.push('sep');
@@ -1875,7 +1968,7 @@ function initBoard() {
 
   window.addEventListener('resize', layoutAll);
   // 속도 목록 바깥을 누르면 닫기
-  window.addEventListener('pointerdown', (e) => !e.target.closest('.menu, .speed') && closeMenus(), true);
+  window.addEventListener('pointerdown', (e) => !e.target.closest('.menu, .speed, .onionbtn') && closeMenus(), true);
 }
 
 function fitView() {
@@ -1944,8 +2037,10 @@ function shapeEl(s) {
   return svgEl('path', { ...common, d: `M${a.join(' ')}L${b.join(' ')}M${l.join(' ')}L${b.join(' ')}L${r.join(' ')}` });
 }
 
+// 프레임별로 그린 것은 그 프레임에서만, 어니언이 켜져 있으면 앞뒤 프레임 것도 옅게 (framedraw.js)
 function renderShapes(it) {
-  it.svg.replaceChildren(...it.shapes.map(shapeEl));
+  it.svg.replaceChildren(...shapeNodes(it));
+  updateFrameBadge(it);
 }
 
 // 지우개 판정용: 도형을 꺾은선으로 근사
@@ -2012,6 +2107,16 @@ function startStroke(ev, it) {
   const el = it.el;
   el.setPointerCapture(ev.pointerId);
   const { tool, color } = app.draw;
+  if (!app.selected.has(it)) select(it, false); // ← → 로 이 영상의 프레임을 옮길 수 있게
+  // 프레임별 그리기: 멈추고 그 프레임에 그린다
+  const perFrame = app.draw.perFrame && isTimed(it);
+  if (perFrame && !it.media.paused) it.media.pause();
+  const cur = perFrame ? currentFrame(it) : shapeFrameOf(it);
+  it.stroking = true;
+  const end = () => {
+    el.onpointermove = el.onpointerup = null;
+    it.stroking = false;
+  };
 
   if (tool === 'eraser') {
     const tol = 6 / rect.width;
@@ -2027,19 +2132,21 @@ function startStroke(ev, it) {
       ]);
       prev = p;
       const n = it.shapes.length;
-      it.shapes = it.shapes.filter((s) => !probes.some((q) => hitShape(s, q, tol)));
+      // 지금 보이는 것만 지운다 (다른 프레임의 그림 · 옅게 보이는 앞뒤 프레임 그림은 그대로)
+      it.shapes = it.shapes.filter((s) => !(shapeVisible(s, cur) && probes.some((q) => hitShape(s, q, tol))));
       if (it.shapes.length !== n) renderShapes(it);
     };
     erase(ev);
     el.onpointermove = erase;
     el.onpointerup = () => {
-      el.onpointermove = el.onpointerup = null;
+      end();
       if (it.shapes.length !== before.length) pushUndo([{ it, before, after: structuredClone(it.shapes) }]);
     };
     return;
   }
 
   const shape = { t: tool, c: color, w: round4(app.draw.width / rect.width), p: [toLocal(ev)] };
+  if (perFrame) shape.f = cur;
   it.shapes.push(shape);
   let node = shapeEl(shape);
   it.svg.append(node);
@@ -2058,7 +2165,7 @@ function startStroke(ev, it) {
     node = next;
   };
   el.onpointerup = () => {
-    el.onpointermove = el.onpointerup = null;
+    end();
     // 화살표/원은 거의 안 끌었으면 버린다
     const [a, b] = [shape.p[0], shape.p[shape.p.length - 1]];
     if (tool !== 'pen' && Math.hypot(b[0] - a[0], b[1] - a[1]) < 4 / rect.width) {
@@ -2066,23 +2173,29 @@ function startStroke(ev, it) {
       node.remove();
       return;
     }
+    if (perFrame) renderShapes(it); // 이제 프레임별 그림이 있다: 프레임을 따라 바꿔 그리기 시작
     pushUndo([{ it, before, after: structuredClone(it.shapes) }]);
   };
 }
 
+// 프레임별 그리기 중이면 지금 프레임의 그림만, 아니면 전부
 function clearDrawings() {
-  const targets = (app.selected.size ? [...app.selected] : [...app.items.values()]).filter((it) => it.shapes.length);
+  const perFrame = app.draw.perFrame;
+  const keep = (it) => (perFrame && isTimed(it) ? ((f) => it.shapes.filter((s) => s.f !== f))(currentFrame(it)) : []);
+  const targets = (app.selected.size ? [...app.selected] : [...app.items.values()]).filter((it) => keep(it).length !== it.shapes.length);
   if (!targets.length) return;
-  const action = targets.map((it) => ({ it, before: structuredClone(it.shapes), after: [] }));
+  const action = targets.map((it) => ({ it, before: structuredClone(it.shapes), after: keep(it) }));
   applyShapes(action, 'after');
   pushUndo(action);
-  toast(tr('그림을 지웠습니다 (Ctrl+Z 로 되돌리기)'));
+  toast(perFrame ? tr('이 프레임의 그림을 지웠습니다 (Ctrl+Z 로 되돌리기)') : tr('그림을 지웠습니다 (Ctrl+Z 로 되돌리기)'));
 }
 
 function setDrawMode(on) {
   app.draw.on = on;
   document.body.classList.toggle('drawing', on);
   $('#btnDraw').classList.toggle('on', on);
+  updateDrawExtrasUi();
+  for (const it of app.items.values()) updateFrameBadge(it);
   if (on) {
     if (document.body.classList.contains('draw-hidden')) toggleDrawHidden(false);
     // 저장된 위치는 툴바가 보인 뒤에야 크기를 알 수 있어 이때 적용
@@ -2097,7 +2210,7 @@ function setTool(tool) {
   app.draw.tool = tool;
   for (const b of document.querySelectorAll('#drawBar [data-tool]')) b.classList.toggle('on', b.dataset.tool === tool);
   document.body.classList.toggle('tool-eraser', tool === 'eraser');
-  rb.setSetting('draw', { tool, color: app.draw.color, width: app.draw.width });
+  rb.setSetting('draw', { tool, color: app.draw.color, width: app.draw.width, perFrame: !!app.draw.perFrame });
 }
 
 function setColor(color) {
@@ -2151,6 +2264,9 @@ function initDraw() {
   $('#btnRedo').onclick = redo;
   $('#btnClearDraw').onclick = clearDrawings;
   $('#btnHideDraw').onclick = () => toggleDrawHidden();
+  $('#btnPerFrame').onclick = () => togglePerFrame();
+  $('#btnBg').onclick = cycleBackground;
+  app.draw.perFrame = !!saved.perFrame;
   $('#btnDrawDone').onclick = () => setDrawMode(false);
   $('#btnDraw').onclick = () => setDrawMode(!app.draw.on);
   const bar = $('#drawBar');
@@ -2187,6 +2303,7 @@ function initDraw() {
   setColor(app.draw.color);
   setWidth(app.draw.width);
   setTool(saved.tool || 'pen');
+  updateDrawExtrasUi();
 }
 
 /* =====================================================================
@@ -2217,6 +2334,8 @@ function serialize() {
       a: it.a,
       b: it.b,
       muted: it.muted,
+      onion: it.onion || undefined,
+      hideMedia: it.hideMedia || undefined,
       t: isTimed(it) ? (it.unloaded ? it.savedT : it.media.currentTime) : 0,
       paused: isTimed(it) ? !it.autoPaused && it.media.paused : false,
       shapes: it.shapes,
@@ -2268,9 +2387,17 @@ let editingId = null;
 function openSettings() {
   refreshAddonStatus();
   $('#settings').classList.remove('hidden');
-  $('#ffmpegPath').value = app.settings.ffmpegPath || 'ffmpeg';
+  $('#ffmpegPath').value = app.settings.ffmpegPath && app.settings.ffmpegPath !== 'ffmpeg' ? app.settings.ffmpegPath : '';
+  $('#checkUpdates').checked = app.settings.checkUpdates !== false;
+  showFfmpegInfo();
   renderSrcList();
   editSource(app.sources.find((s) => s.id === (editingId || app.sourceId)) || app.sources[0] || null);
+}
+
+// 지금 쓰는 ffmpeg: 직접 지정 / MoRef 에 들어 있는 것 / PATH
+async function showFfmpegInfo() {
+  const i = await rb.ffmpegInfo();
+  $('#ffmpegInfo').textContent = i.custom ? tr('지정한 ffmpeg 를 씁니다') : i.bundled ? tr('MoRef 에 들어 있는 ffmpeg 를 씁니다') : tr('PATH 의 ffmpeg 를 씁니다 (MoRef 에 들어 있지 않음)');
 }
 
 function renderSrcList() {
@@ -2379,14 +2506,20 @@ function initSettings() {
     renderSourceSelect();
     openFolder('');
   };
-  $('#ffmpegPath').onchange = (e) => {
-    app.settings.ffmpegPath = e.target.value.trim() || 'ffmpeg';
-    rb.setSetting('ffmpegPath', app.settings.ffmpegPath);
+  $('#checkUpdates').onchange = (e) => {
+    app.settings.checkUpdates = e.target.checked;
+    rb.setSetting('checkUpdates', e.target.checked);
+  };
+  $('#ffmpegPath').onchange = async (e) => {
+    app.settings.ffmpegPath = e.target.value.trim() || 'ffmpeg'; // 'ffmpeg' = 자동 (src/ffmpeg.js)
+    await rb.setSetting('ffmpegPath', app.settings.ffmpegPath);
+    showFfmpegInfo();
   };
   $('#btnClearThumbs').onclick = async () => {
-    await rb.thumb.clear();
-    toast(tr('썸네일 캐시를 비웠습니다'));
+    const freed = await rb.thumb.clear();
+    toast(tr('캐시를 비웠습니다 ({0})', fmtSize(freed) || `${Math.round((freed || 0) / 1e6)}MB`));
     thumbDone.clear();
+    thumbUrls.clear(); // 구간 · 예고편 썸네일 주소 (segthumbs.js)
     renderGrid();
   };
   for (const m of document.querySelectorAll('.modal')) {
@@ -2486,6 +2619,8 @@ function initKeys() {
         each((it) => it.segments?.[Number(e.key) - 1] && activateSegment(it, it.segments[Number(e.key) - 1].id));
         break;
       case 'g': case 'G': each(toggleFrames); break;
+      case 'k': case 'K': each(toggleOnion); break;
+      case 'b': case 'B': each(toggleHideMedia); updateDrawExtrasUi(); break;
       case 'f': case 'F': fitView(); break;
       case 'd': case 'D': setDrawMode(!app.draw.on); break;
       case 'h': case 'H': toggleDrawHidden(); break;
@@ -2531,7 +2666,9 @@ async function main() {
   initPeek();
   initMediaSaver();
   initKeys();
-  requestAnimationFrame(tick);
+  // 입력이 있으면 진행 바 / 프레임 번호를 바로 따라가게 (GIF 이동 · 진행 바 끌기는 미디어 이벤트가 없다)
+  for (const ev of ['pointerdown', 'pointermove', 'wheel', 'keydown']) window.addEventListener(ev, wakeTick, { capture: true, passive: true });
+  wakeTick();
 
   await loadClipLib();
   const last = st.lastFolder;

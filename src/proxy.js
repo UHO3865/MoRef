@@ -106,7 +106,8 @@ async function serveDav(req, res, src, rel) {
     let end = m && m[2] !== '' ? Number(m[2]) : Infinity;
     const browser = /Chrome\//.test(req.headers['user-agent'] || '');
     const size = browser ? CHUNK : CHUNK_FFMPEG;
-    const priority = browser ? 'high' : 'low'; // 재생이 썸네일 / fps 읽기보다 먼저 (sources.js 의 차례)
+    // 재생이 썸네일 / fps 읽기보다 먼저 (sources.js 의 차례). 화면이 뒤에서 읽는 것(어니언 스킨의 옆 프레임: ?bg=1)은 재생 다음
+    const priority = browser ? (/[?&]bg=1\b/.test(req.url) ? 'normal' : 'high') : 'low';
     const first = await fetchChunk(src, rel, start, end, size, priority);
     copy(first.headers);
     if (first.status === 200) {

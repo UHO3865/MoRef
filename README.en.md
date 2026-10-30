@@ -22,11 +22,8 @@ Download from [Releases](../../releases).
 | `MoRef-Blender-Addon-x.y.z.zip` | Blender add-on (Blender 4.2 or later). It is also included in the installer, so you don't need to download it separately |
 
 - The installer is not code-signed, so SmartScreen may warn you the first time. Click **More info ▸ Run anyway**.
-- **FFmpeg is required.** If it is on your PATH it is used as is; otherwise set the path to `ffmpeg.exe` in the settings.
-
-  ```bash
-  winget install Gyan.FFmpeg
-  ```
+- FFmpeg is included in the installer, so you don't need to install it. To use a different FFmpeg, set the path to `ffmpeg.exe` in the settings.
+- MoRef tells you at the top of the window when a new version is out (you can turn this off in the settings).
 
 - On first launch MoRef asks whether to install the Blender add-on. Click **Install** and it turns on the next time you start Blender.
 
@@ -53,7 +50,9 @@ npm install
 npm start
 ```
 
-Build the release files (created in `dist/`):
+When run from source, MoRef uses FFmpeg from your PATH (or the one `npm run ffmpeg` downloads).
+
+Build the release files (created in `dist/`). This first downloads the FFmpeg to bundle:
 
 ```bash
 npm run dist
@@ -72,3 +71,5 @@ If MoRef helps you, you can buy me a coffee.
 ## License
 
 [MIT](LICENSE)
+
+The FFmpeg in the installer is an [LGPL v2.1](https://ffmpeg.org/legal.html) build ([BtbN/FFmpeg-Builds](https://github.com/BtbN/FFmpeg-Builds)). Its license and build details are in `resources/ffmpeg` in the install folder.

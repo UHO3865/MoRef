@@ -37,6 +37,24 @@ function initUpdateNotice() {
     bar.dataset.kind = kind;
     bar.hidden = false;
   });
+
+  // 설치판: GitHub 에 새 릴리스가 나왔다 (src/release.js). 받기는 릴리스 페이지에서
+  const rel = h('div', 'update-bar release-bar');
+  rel.hidden = true;
+  document.body.append(rel);
+  rb.update.onRelease(({ version, current, url }) => {
+    const ic = h('span', 'ic-wrap');
+    ic.innerHTML = icon('refresh');
+    const get = h('button', 'primary', tr('받으러 가기'));
+    get.onclick = () => {
+      window.open(url); // 기본 브라우저로 (main.js 의 setWindowOpenHandler)
+      rel.hidden = true;
+    };
+    const later = h('button', '', tr('나중에'));
+    later.onclick = () => (rel.hidden = true);
+    rel.replaceChildren(ic, h('span', 'msg', tr('새 버전 {0} 이 나왔습니다 (지금 {1})', version, current)), get, later);
+    rel.hidden = false;
+  });
 }
 
 async function saveBeforeReload() {

@@ -68,6 +68,8 @@ function applyVisual(it) {
   m.style.objectFit = grid ? 'contain' : 'fill';
   it.vis.style.transform = it.flipH || it.flipV ? `scale(${it.flipH ? -1 : 1}, ${it.flipV ? -1 : 1})` : '';
   it.vis.style.filter = it.gray ? 'grayscale(1)' : '';
+  applyBackground(it); // 영상 숨김 (그림만 - framedraw.js)
+  syncOnionBox(it);
   updateViewBadges(it);
 }
 
@@ -78,6 +80,7 @@ function updateViewBadges(it) {
     it.flipH && ['mirror', tr('좌우 반전')],
     it.flipV && ['flipV', tr('상하 반전')],
     it.gray && ['gray', tr('흑백')],
+    it.hideMedia && ['bgHidden', tr('영상 숨김 (그림만)')],
     it.crop && ['crop', tr('잘림')],
     it.sync && ['link', tr('Blender 타임라인에 맞춤')],
   ].filter(Boolean);

@@ -1,5 +1,5 @@
 'use strict';
-/* global app, $, h, icon, toast, isTimed, fpsOf, currentFrame, seekFrame, markDirty, updateViewBadges */
+/* global app, $, h, icon, toast, isTimed, fpsOf, currentFrame, seekFrame, markDirty, updateViewBadges, wakeTick */
 // Blender 타임라인 동기화 (Blender 애드온과 연결됐을 때 - src/blender.js)
 //
 // 애드온이 보내는 상태 { frame, fps, playing } 에 맞춰, "Blender 타임라인에 맞추기"를 켠 레퍼런스를 움직인다.
@@ -85,6 +85,7 @@ function onBlenderLink(link) {
 
 function onBlenderState(st) {
   app.blender = st;
+  wakeTick();
   const info = $('#blenderInfo');
   if (info) {
     const f = Math.abs(st.fps - Math.round(st.fps)) < 0.01 ? Math.round(st.fps) : st.fps.toFixed(2);

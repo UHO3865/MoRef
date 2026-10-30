@@ -22,11 +22,8 @@ https://github.com/user-attachments/assets/77820e48-c7a9-4285-9323-775c173bb6a0
 | `MoRef-Blender-Addon-x.y.z.zip` | Blender アドオン (Blender 4.2 以降)。インストーラーにも含まれているので、別途ダウンロードしなくてもかまいません |
 
 - コード署名がないため、初回実行時に SmartScreen の警告が出ることがあります。**詳細情報 ▸ 実行** を押してください。
-- **FFmpeg が必要です。** PATH にあればそのまま使い、なければ設定で `ffmpeg.exe` のパスを指定します。
-
-  ```bash
-  winget install Gyan.FFmpeg
-  ```
+- FFmpeg はインストーラーに含まれているので、別途インストールする必要はありません。別の FFmpeg を使う場合は、設定で `ffmpeg.exe` のパスを指定します。
+- 新しいバージョンが出るとウィンドウ上部でお知らせします (設定でオフにできます)。
 
 - 初回起動時に Blender アドオンをインストールするか聞かれます。**インストール** を押すと、次に Blender を起動したときに自動で有効になります。
 
@@ -53,7 +50,9 @@ npm install
 npm start
 ```
 
-リリースファイルの作成(`dist/` に作られます):
+ソースから実行するときは PATH の FFmpeg を使います (`npm run ffmpeg` でダウンロードしておくとそれを使います)。
+
+リリースファイルの作成(`dist/` に作られます)。同梱する FFmpeg を先にダウンロードします:
 
 ```bash
 npm run dist
@@ -72,3 +71,5 @@ MoRef が役に立ったら、コーヒー 1 杯で応援してください。
 ## ライセンス
 
 [MIT](LICENSE)
+
+インストーラーに含まれる FFmpeg は [LGPL v2.1](https://ffmpeg.org/legal.html) ビルド ([BtbN/FFmpeg-Builds](https://github.com/BtbN/FFmpeg-Builds)) です。ライセンスとビルド情報はインストール先の `resources/ffmpeg` にあります。

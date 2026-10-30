@@ -8,6 +8,8 @@
   "scripts": {
     "start": "electron .",
     "selftest": "electron . --selftest",
+    "ffmpeg": "node scripts/fetch-ffmpeg.js",
+    "predist": "node scripts/fetch-ffmpeg.js",
     "dist": "electron-builder --win nsis",
     "addon": "python scripts/make-addon-zip.py"
   },
@@ -58,6 +60,10 @@
         "filter": [
           "__init__.py"
         ]
+      },
+      {
+        "from": "vendor/ffmpeg",
+        "to": "ffmpeg"
       }
     ]
   }

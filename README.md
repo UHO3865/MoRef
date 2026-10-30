@@ -22,11 +22,8 @@ https://github.com/user-attachments/assets/2c60ea89-3a38-4594-82d6-5f23b848b247
 | `MoRef-Blender-Addon-x.y.z.zip` | Blender 애드온 (Blender 4.2 이상). 설치 프로그램에도 들어 있어서 따로 받지 않아도 됩니다 |
 
 - 코드 서명이 없어서 처음 실행할 때 SmartScreen 경고가 나올 수 있습니다. **추가 정보 ▸ 실행**을 누르세요.
-- **FFmpeg가 필요합니다.** PATH에 있으면 그대로 쓰고, 아니면 설정에서 `ffmpeg.exe` 경로를 지정합니다.
-
-  ```bash
-  winget install Gyan.FFmpeg
-  ```
+- FFmpeg가 설치 프로그램에 들어 있어서 따로 설치하지 않아도 됩니다. 다른 FFmpeg를 쓰려면 설정에서 `ffmpeg.exe` 경로를 지정합니다.
+- 새 버전이 나오면 앱 위쪽에 알려 줍니다 (설정에서 끌 수 있습니다).
 
 - Blender 애드온은 처음 실행할 때 설치할지 묻습니다. **설치**를 누르면 다음에 Blender를 켤 때 자동으로 켜집니다.
 
@@ -53,7 +50,9 @@ npm install
 npm start
 ```
 
-릴리즈 파일 만들기 (`dist/`에 생깁니다):
+소스에서 실행할 때는 PATH의 FFmpeg를 씁니다 (`npm run ffmpeg`로 받아 두면 그것을 씁니다).
+
+릴리즈 파일 만들기 (`dist/`에 생깁니다). 함께 넣을 FFmpeg를 먼저 받습니다:
 
 ```bash
 npm run dist
@@ -74,3 +73,5 @@ MoRef が役に立ったら、コーヒー 1 杯で応援してください。
 ## 라이선스
 
 [MIT](LICENSE)
+
+설치 프로그램에 들어 있는 FFmpeg는 [LGPL v2.1](https://ffmpeg.org/legal.html) 빌드([BtbN/FFmpeg-Builds](https://github.com/BtbN/FFmpeg-Builds))입니다. 설치 폴더의 `resources/ffmpeg`에 라이선스와 빌드 정보가 있습니다.

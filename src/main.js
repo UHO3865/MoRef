@@ -11,6 +11,7 @@ const blender = require('./blender');
 const addonInstall = require('./addoninstall');
 const i18n = require('./i18n');
 const jsonfile = require('./jsonfile');
+const caches = require('./caches');
 
 const SELFTEST = process.argv.includes('--selftest');
 if (SELFTEST) {
@@ -22,6 +23,8 @@ if (SELFTEST) {
 } else {
   useUserData();
 }
+// 프록시로 받은 영상 조각도 Chromium 디스크 캐시에 쌓인다: 상한을 둔다 (없으면 디스크 여유에 따라 수 GB 까지)
+app.commandLine.appendSwitch('disk-cache-size', String(caches.DISK_CACHE_BYTES));
 
 // 설정 / 캐시 폴더: %APPDATA%\MoRef. 이름을 바꾸기 전(RefBoard)의 폴더가 있으면 그대로 옮겨 쓴다.
 // 옮기지 못하면(파일이 잡혀 있는 등) 예전 폴더를 계속 쓴다 (Blender 애드온도 두 곳을 모두 찾는다)
@@ -154,7 +157,8 @@ function registerIpc() {
   });
   ipcMain.on('thumb:drop', (_e, entry) => thumbs.drop(entry));
   ipcMain.on('thumb:cancel', () => thumbs.cancelQueued());
-  ipcMain.handle('thumb:clear', () => thumbs.clearCache());
+  ipcMain.handle('thumb:clear', () => caches.clearAll()); // 썸네일만이 아니라 다시 만들 수 있는 캐시 전부
+  ipcMain.handle('ffmpeg:info', () => require('./ffmpeg').describe());
 
   ipcMain.handle('file:url', (_e, abs) => proxy.fileUrl(abs));
   ipcMain.handle('media:probe', (_e, ref) => probe.probe(ref));
@@ -261,10 +265,13 @@ if (firstInstance) app.whenReady().then(async () => {
   }
   await proxy.start();
   thumbs.init();
+  caches.schedule();
   registerIpc();
   createWindow();
   // 새 버전 알림은 소스 폴더에서 실행할 때만 (설치판은 코드가 바뀌지 않는다)
   if ((!SELFTEST && !app.isPackaged) || process.env.RB_WATCH) watchForUpdates();
+  // 설치판: GitHub 의 새 릴리스 알림 (소스 폴더는 위의 코드 변경 알림을 쓴다)
+  if ((!SELFTEST && app.isPackaged) || process.env.RB_RELEASE_URL) require('./release').start(win, { force: !!process.env.RB_RELEASE_URL });
   if (!SELFTEST) rememberAppPath();
   if (!SELFTEST || process.env.RB_ADDON_TEST) win.webContents.once('did-finish-load', checkBlenderAddon);
 });

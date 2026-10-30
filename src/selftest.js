@@ -1,6 +1,7 @@
 // `npm run selftest` - 실제 창을 띄워 탐색 → 보드에 열기 → 구간반복/속도 → 저장 → 닫기 → 다시 불러오기를
 // 자동으로 수행하고 단계별 스크린샷을 남긴다. 소스는 환경변수로 받는다:
 //   RB_TEST_URL, RB_TEST_TYPE(dav|local), RB_TEST_USER, RB_TEST_PASS, RB_TEST_OUT(스크린샷 폴더)
+// 시험 파일(fps · GIF · 반전 · 썸네일 단계에 필요한 것)은 scripts/make-test-media.js 로 만든다.
 const fs = require('fs');
 const path = require('path');
 const { app } = require('electron');
@@ -16,12 +17,18 @@ async function run(win) {
       console.log('[selftest] JS FAILED:', code.replace(/\s+/g, ' ').slice(0, 220));
       throw e;
     });
+  // 스크린샷이 실패해도(드물게 GPU 쪽 오류) 점검은 이어간다 - 화면 픽셀로 확인하는 단계가 따로 있다
   const shot = async (name) => {
-    const img = await win.webContents.capturePage();
-    fs.writeFileSync(path.join(out, name + '.png'), img.toPNG());
+    try {
+      const img = await win.webContents.capturePage();
+      fs.writeFileSync(path.join(out, name + '.png'), img.toPNG());
+    } catch (e) {
+      console.log('[selftest] screenshot failed', name, e.message);
+    }
   };
   const log = (...a) => console.log('[selftest]', ...a);
   win.webContents.on('console-message', (e) => log('console:', e.message));
+  win.on('minimize', () => log('window minimized (화면 캡처가 실패한다)'));
 
   // RB_TEST_SCRIPT=<파일>: 전체 점검 대신 그 파일의 시나리오만 실행 (module.exports = async ({ win, js, shot, log, wait }) => …)
   if (process.env.RB_TEST_SCRIPT) {
@@ -281,9 +288,9 @@ async function run(win) {
       // 재생 버튼 클릭 → 0.9초 뒤 위치 (1x)
       await js(`${G}.media.currentTime = 0`);
       const pb = await R(`${G}.ctl.play`);
+      const t0 = Date.now(); // click() 이 누른 뒤 잠깐 기다리므로 누르기 전부터 잰다
       await click(pb.left + pb.width / 2, pb.top + pb.height / 2);
-      const t0 = Date.now();
-      await wait(900);
+      await wait(Math.max(0, 900 - (Date.now() - t0)));
       const s1 = JSON.parse(await js(`JSON.stringify({ t: ${G}.media.currentTime, f: ${G}.media.frameIndex, paused: ${G}.media.paused })`));
       log('play 1x after', Date.now() - t0, 'ms →', JSON.stringify({ t: +s1.t.toFixed(2), frame: s1.f + 1, paused: s1.paused }), '(1x: t≈0.9 → frame 6)');
 
@@ -329,7 +336,10 @@ async function run(win) {
       };
       const shownFrame = async (expr) => {
         const r = JSON.parse(await js(`JSON.stringify((${expr}).el.getBoundingClientRect())`));
-        const img = await win.webContents.capturePage({ x: Math.round(r.left + r.width * 0.25) - 2, y: Math.round(r.top + r.height * 0.6) - 2, width: 4, height: 4 });
+        const area = { x: Math.round(r.left + r.width * 0.25) - 2, y: Math.round(r.top + r.height * 0.6) - 2, width: 4, height: 4 };
+        const img = await win.webContents.capturePage(area).catch((e) => {
+          throw new Error(`${e.message} capturing ${JSON.stringify(area)} of ${JSON.stringify(r)} in ${JSON.stringify(win.getContentBounds())}`);
+        });
         const px = img.toBitmap(); // BGRA
         return Math.round(px[1] / 8.15); // 회색이라 G 만 봐도 된다
       };
@@ -529,12 +539,67 @@ async function run(win) {
       // GIF: 시각 기준 (vardelay: 프레임 시작 0,50,150,300,500ms…) → Blender 12프레임@24fps = 0.5초 = 5번째 프레임
       await js(`(async () => { window.__sg = await RB.addItem({ kind: 'gif', ref: { sourceId: RB.app.sourceId, path: 'thumbtest/vardelay.gif' }, name: 'vardelay.gif', x: 14000, y: 0, paused: true }); })()`);
       await wait(1500);
+      await js(`goToItem(window.__sg)`); // 화면 밖의 항목은 맞추지 않는다 (보일 때 맞춤 - media.js)
+      await wait(600);
       await B(500);
       await js(`(() => { const g = window.__sg; g.media.currentTime = 0; toggleSync(g); })()`);
       await B(512);
       await wait(200);
       log('sync: gif B512 → frame', (await js(`window.__sg.media.frameIndex`)) + 1, '(기대 5)', '| badge', await js(`window.__sg.el.classList.contains('has-view')`));
       await js(`RB.removeItem(window.__sg)`);
+    }
+
+    // ---- 패널 미리 보기 (꾹 누르기 · 마우스 올려 두기) / 어니언 스킨 / 멈춘 보드의 갱신 횟수 ----
+    {
+      const send = (ev) => win.webContents.sendInputEvent(ev);
+      await js('RB.openFolder("")');
+      await wait(1500);
+      const c = JSON.parse(await js(`(() => { const c = document.querySelector('#grid .card.video'); if (!c) return 'null'; const r = c.getBoundingClientRect(); return JSON.stringify({ x: r.left + r.width / 2, y: r.top + r.height / 3, name: c._entry.name }); })()`));
+      if (c) {
+        const peekState = () => js(`JSON.stringify({ shown: !$('.peek').hidden, name: $('.peek .nm')?.textContent || '', t: +($('.peek video')?.currentTime || 0).toFixed(1) })`);
+        send({ type: 'mouseMove', x: c.x, y: c.y });
+        send({ type: 'mouseDown', x: c.x, y: c.y, button: 'left', clickCount: 1 });
+        await wait(1500);
+        log('peek: hold 1.5s', await peekState());
+        send({ type: 'mouseUp', x: c.x, y: c.y, button: 'left', clickCount: 1 });
+        await wait(200);
+        log('peek: released', await peekState());
+        // 마우스를 올려 두면 예고편 8장면
+        send({ type: 'mouseMove', x: c.x + 2, y: c.y });
+        let shots = '0';
+        for (let i = 0; i < 60 && shots !== '8'; i++) {
+          await wait(250);
+          shots = await js(`String(document.querySelectorAll('.card .trailer .tbar i.ok').length)`);
+        }
+        log('trailer: shots', shots);
+        send({ type: 'mouseMove', x: 900, y: 500 });
+        await wait(200);
+        log('trailer: gone after leaving', await js(`!document.querySelector('.card .trailer')`));
+      }
+      // 어니언 스킨: 영상 / GIF. 겹쳐 그린 점 수 (0 이면 실패)
+      const ghost = (it) => js(`(() => { const cv = (${it}).onionCv; if (!cv) return 'no canvas'; const d = cv.getContext('2d').getImageData(0, 0, cv.width, cv.height).data; let n = 0; for (let i = 3; i < d.length; i += 4) if (d[i] > 10) n++; return JSON.stringify({ hidden: cv.hidden, size: cv.width + 'x' + cv.height, ghostPx: n, gpu: !!onionGlState }); })()`);
+      const V = `([...RB.app.items.values()].find(i => i.name === '점프 01.mp4') || [...RB.app.items.values()].find(i => i.kind === 'video'))`;
+      await js(`(() => { const it = ${V}; it.media.pause(); seekFrame(it, 30); goToItem(it); return 1; })()`);
+      await wait(1500);
+      await js(`toggleOnion(${V}); 1`);
+      await wait(1500);
+      log('onion: video', await ghost(V));
+      // GPU 로 합칠 때 위아래가 맞는지: 같은 프레임끼리 합치면 다른 곳이 없어야 한다 (뒤집히면 화면 대부분이 칠해진다)
+      log('onion: same frame on GPU, differing px (expect 0)', await js(`(async () => { const v = (${V}).media; const st = onionGl(); if (!st) return 'no webgl'; const W = 320, H = 180; const bmp = await shrink(v, W, H); blendGpu(st, v, [{ bmp, tint: [255, 0, 0], alpha: 1 }], W, H); const c = document.createElement('canvas'); c.width = W; c.height = H; const g = c.getContext('2d'); g.drawImage(st.canvas, 0, 0); const d = g.getImageData(0, 0, W, H).data; let n = 0; for (let i = 3; i < d.length; i += 4) if (d[i] > 10) n++; bmp.close(); return n; })()`));
+      await js(`toggleOnion(${V}); 1`);
+      // (자르기 점검에서 보드를 다시 불러와 항목이 새로 만들어졌다: 보드에서 찾는다)
+      const GIF = `[...RB.app.items.values()].find(i => i.kind === 'gif')`;
+      if (!(await js(`!!${GIF}`))) log('onion: gif skipped (no gif on board)');
+      else {
+        await js(`(() => { const g = ${GIF}; g.media.pause(); g.media.stepFrame(1); goToItem(g); setOnion(g, 2); return 1; })()`);
+        await wait(1200);
+        log('onion: gif', await ghost(GIF));
+        await js(`setOnion(${GIF}, 0); 1`);
+      }
+      // 모두 멈춘 보드: 1초에 4번만 갱신 (재생 중이면 매 화면)
+      await js(`(() => { for (const it of RB.app.items.values()) if (it.media?.pause) { it.autoPaused = false; it.media.pause(); } return 1; })()`);
+      await wait(800);
+      log('idle board: ticks in 1s', await js(`new Promise((r) => { let n = 0; const o = tick; tick = function () { n++; return o(); }; setTimeout(() => { tick = o; r(n); }, 1000); })`));
     }
 
     // 저장 → 전부 닫기 → 다시 불러오기
@@ -604,6 +669,19 @@ async function run(win) {
     log('draw: after reload', await shapesOf());
     await key('Escape');
     log('draw: mode after Esc', await js('RB.app.draw.on'));
+    // 프레임별 그림: 그 프레임에서만 보이고, 배경을 숨겨도 그림은 보인다
+    {
+      const FV = `([...RB.app.items.values()].find(i => i.kind === 'video'))`;
+      const shown = () => js(`[...(${FV}).svg.children].filter((n) => !n.classList.contains('ghost') && n.getAttribute('stroke') === '#ff00aa').length`);
+      await js(`(() => { const it = ${FV}; it.media.pause(); seekFrame(it, 10); return 1; })()`);
+      await wait(900);
+      await js(`(() => { const it = ${FV}; it.shapes.push({ t: 'pen', c: '#ff00aa', w: 0.01, p: [[0.1, 0.1], [0.3, 0.2]], f: 10 }); renderShapes(it); setBackground(it, 'hidden'); return 1; })()`);
+      const at10 = await shown();
+      await js(`seekFrame(${FV}, 11)`);
+      await wait(900);
+      log('frame draw: shown at f10', at10, '| at f11', await shown(), '| video hidden', await js(`(${FV}).vis.style.opacity === '0'`));
+      await js(`(() => { const it = ${FV}; it.shapes = it.shapes.filter((s) => s.c !== '#ff00aa'); setBackground(it, 'normal'); renderShapes(it); return 1; })()`);
+    }
     await shot('9-drawn-reloaded');
 
     await js(`rb.setSetting('opacity', 0.6); rb.setSetting('alwaysOnTop', true)`);
