@@ -296,7 +296,7 @@ async function renameRange(r) {
 }
 
 async function deleteRange(r) {
-  if (!confirm(tr('이 구간을 지울까요? ({0} · {1})', rowName(r), r.e.meta.name))) return;
+  if (!(await askConfirm(tr('이 구간을 지울까요? ({0} · {1})', rowName(r), r.e.meta.name), { okLabel: tr('삭제'), danger: true }))) return;
   await patchRange(r.e.key, r.s.id, { delete: true });
 }
 
@@ -344,7 +344,7 @@ function folderMenu(ev, id) {
     'sep',
     { label: tr('폴더 삭제 (안의 구간은 미분류로)'), icon: 'trash', danger: true, action: async () => {
       const ids = [...folderAndBelow(id)];
-      if (!confirm(tr('"{0}" 폴더를 지울까요? 안에 있던 구간은 지워지지 않고 미분류로 옮겨집니다.', f.name))) return;
+      if (!(await askConfirm(tr('"{0}" 폴더를 지울까요? 안에 있던 구간은 지워지지 않고 미분류로 옮겨집니다.', f.name), { okLabel: tr('삭제'), danger: true }))) return;
       await rb.clips.clearFolders(ids);
       L.folders = await rb.clips.setFolders(L.folders.filter((x) => !ids.includes(x.id)));
       if (ids.includes(L.folder)) L.folder = 'all';
@@ -422,5 +422,37 @@ function askText(title, value, placeholder, suggestions = []) {
       if (ev.key === 'Escape') done(null);
     };
     setTimeout(() => (inp.focus(), inp.select()), 0);
+  });
+}
+
+// 지우기 같은 확인: Windows 기본 창(confirm) 대신 앱 안의 창. Enter = 확인, Esc / 바깥 누르기 = 취소
+function askConfirm(message, { okLabel = tr('확인'), danger = false } = {}) {
+  return new Promise((resolve) => {
+    closeMenu();
+    const modal = h('div', 'modal ask-modal');
+    const card = h('div', 'modal-card ask-card');
+    const row = h('div', 'ask-row');
+    const ok = h('button', danger ? 'btn primary danger' : 'btn primary', okLabel);
+    const cancel = h('button', 'btn', tr('취소'));
+    row.append(cancel, ok);
+    card.append(h('div', 'ask-msg', message), row);
+    modal.append(card);
+    document.body.append(modal);
+    const done = (v) => {
+      modal.remove();
+      document.removeEventListener('keydown', onKey, true);
+      resolve(v);
+    };
+    const onKey = (ev) => {
+      if (ev.key !== 'Enter' && ev.key !== 'Escape') return;
+      ev.preventDefault();
+      ev.stopPropagation();
+      done(ev.key === 'Enter');
+    };
+    document.addEventListener('keydown', onKey, true); // 보드 단축키(Delete, Space …)로 새지 않게 먼저 받는다
+    ok.onclick = () => done(true);
+    cancel.onclick = () => done(false);
+    modal.onpointerdown = (ev) => ev.target === modal && done(false);
+    setTimeout(() => ok.focus(), 0);
   });
 }
