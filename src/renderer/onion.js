@@ -1,5 +1,5 @@
 'use strict';
-/* global h, tr, toast, isTimed, fpsOf, currentFrame, totalFrames, markDirty */
+/* global app, rb, h, tr, toast, isTimed, fpsOf, currentFrame, totalFrames, markDirty, ensureLoaded, closeMenus, refreshCtl */
 // 어니언 스킨: 멈춰 있을 때 앞뒤 프레임을 색을 입혀 겹쳐 보여 준다 (Blender 의 어니언 스킨처럼)
 //  * 지금 프레임과 달라진 곳만 칠한다: 움직인 부분이 어디서 와서 어디로 가는지 보이고, 가만히 있는 배경은 그대로
 //  * 이전 프레임은 초록, 다음 프레임은 파랑. 지금 프레임에서 멀수록 옅게
@@ -8,33 +8,115 @@
 //    한 프레임씩 넘길 때는 새로 생긴 끝 프레임 하나만 더 읽는다. GIF: 이미 읽어 둔 프레임을 쓴다
 //  * 합치기는 GPU(WebGL 셰이더)로: 화면 스레드를 막지 않고 1280px 까지 그린다. WebGL 이 없으면 CPU 로 640px
 
-const ONION_COUNTS = [1, 2, 3];
+const ONION_MAX = 10; // 이전 / 다음 각각 최대 프레임 수
 const ONION_MAX_W_GPU = 1280; // 이 너비로 줄여서 합친다
 const ONION_MAX_W = 640; // CPU 로 합칠 때 (느리지 않게)
 const ONION_BEFORE = [60, 220, 110];
 const ONION_AFTER = [80, 150, 255];
 const ONION_DIFF = 14; // 이보다 작은 차이는 같은 것으로 (압축 노이즈)
-const ONION_CACHE = 12; // 영상마다 기억해 둘 프레임 수 (앞뒤 3 + 한 칸씩 넘길 때 다시 쓰는 것)
+
+// it.onion = { b: 이전 프레임 수, a: 다음 프레임 수 } | 0 (꺼짐). 예전 보드의 숫자 n 은 { b: n, a: n }
+function onionCounts(v) {
+  if (!v) return null;
+  const c = typeof v === 'number' ? { b: v, a: v } : v;
+  const clamp = (x) => Math.max(0, Math.min(ONION_MAX, Math.round(Number(x) || 0)));
+  const r = { b: clamp(c.b), a: clamp(c.a) };
+  return r.b || r.a ? r : null;
+}
+// 새로 켤 때는 마지막으로 쓴 값 (설정에 기억)
+const onionDefault = () => onionCounts(app.settings.onionDefault) || { b: 2, a: 2 };
+// 영상마다 기억해 둘 프레임: 보이는 것 + 한 칸씩 넘길 때 다시 쓰는 것
+const onionCacheSize = (it) => Math.max(12, (it.onion?.b || 0) + (it.onion?.a || 0) + 6);
 
 function toggleOnion(it) {
   if (!isTimed(it)) return;
-  setOnion(it, it.onion ? 0 : 2);
-  toast(it.onion ? tr('어니언 스킨: 앞뒤 {0}프레임 (멈췄을 때 보입니다)', it.onion) : tr('어니언 스킨 끔'));
+  setOnion(it, it.onion ? 0 : onionDefault());
+  toast(it.onion ? tr('어니언 스킨: 이전 {0} · 다음 {1}프레임 (멈췄을 때 보입니다)', it.onion.b, it.onion.a) : tr('어니언 스킨 끔'));
 }
 
-function setOnion(it, n) {
+// remember: 다음에 켤 때의 기본값으로 기억 (보드를 불러올 때는 아님)
+function setOnion(it, v, { remember = true } = {}) {
   if (!isTimed(it)) return;
-  it.onion = n || 0;
+  it.onion = onionCounts(v) || 0;
   it.ctl?.onion?.classList.toggle('on', !!it.onion);
+  updateOnionMenu(it);
   markDirty();
   if (!it.onion) return closeOnion(it);
+  if (remember) {
+    app.settings.onionDefault = it.onion;
+    rb.setSetting('onionDefault', it.onion);
+  }
   if (!it.onionCv) {
     it.onionCv = h('canvas', 'onion');
     it.onionCv.hidden = true;
     it.vis.append(it.onionCv);
     syncOnionBox(it);
   }
+  // 멈춘 채 올려 둔 영상은 아직 받지 않았다 (preload none): 지금 프레임을 받아야 겹쳐 볼 수 있다
+  // (보드를 불러오는 중이면 아직 주소가 없다: 보이게 되면 onionTick 이 받는다)
+  if (it.kind === 'video' && it.srcUrl && it.onScreen !== false) ensureLoaded(it);
   it.onionKey = null; // 다시 그린다
+}
+
+/* ---------- 이전 / 다음 프레임 수 고르기 (컨트롤 바의 어니언 버튼) ---------- */
+
+function buildOnionMenu(it, bar) {
+  const m = h('div', 'menu onion-menu');
+  m.append(h('div', 'om-title', tr('어니언 스킨')));
+  const row = (label, key, cls) => {
+    const r = h('div', 'om-row ' + cls);
+    const minus = h('button', 'om-step', '−');
+    const val = h('b', 'om-val');
+    const plus = h('button', 'om-step', '+');
+    const change = (d) => {
+      const c = it.onion || onionDefault();
+      setOnion(it, { ...c, [key]: c[key] + d });
+      if (!it.onion) closeMenus();
+    };
+    minus.onclick = (e) => (e.stopPropagation(), change(-1));
+    plus.onclick = (e) => (e.stopPropagation(), change(1));
+    r.onwheel = (e) => (e.preventDefault(), e.stopPropagation(), change(e.deltaY < 0 ? 1 : -1));
+    r.append(h('span', 'om-dot'), h('span', 'om-label', label), minus, val, plus);
+    m.append(r);
+    return val;
+  };
+  it.ctl.onionB = row(tr('이전 (초록)'), 'b', 'before');
+  it.ctl.onionA = row(tr('다음 (파랑)'), 'a', 'after');
+  const off = h('button', 'om-off', tr('끄기'));
+  off.onclick = (e) => {
+    e.stopPropagation();
+    setOnion(it, 0);
+    closeMenus();
+  };
+  m.append(off);
+  it.ctl.onionMenu = m;
+  bar.append(m);
+  updateOnionMenu(it);
+}
+
+function updateOnionMenu(it) {
+  if (!it.ctl?.onionB) return;
+  const c = it.onion || onionDefault();
+  it.ctl.onionB.textContent = c.b;
+  it.ctl.onionA.textContent = c.a;
+}
+
+// 어니언 버튼: 꺼져 있으면 켜고, 켜져 있으면 프레임 수 고르기를 열고 닫는다
+function onionButton(it) {
+  if (!it.onion) {
+    toggleOnion(it);
+    return;
+  }
+  openOnionMenu(it, !it.ctl.onionMenu.classList.contains('open'));
+}
+
+function openOnionMenu(it, open = true) {
+  closeMenus();
+  if (!open) return;
+  if (!it.onion) setOnion(it, onionDefault());
+  it.ctl.onionMenu.classList.add('open');
+  it.ctlEl.classList.add('menu-open');
+  refreshCtl(it);
 }
 
 function closeOnion(it) {
@@ -67,9 +149,11 @@ function onionTick(it) {
   const ready = it.kind === 'gif' ? v.frameCount > 0 && !v.grid : v.readyState >= 2 && !it.unloaded;
   const show = ready && v.paused && !v.seeking && it.pendingSeek == null && !it.cropEdit;
   if (cv.hidden === show) cv.hidden = !show;
+  // 화면 밖에 나갔다 돌아와 내려 둔 영상(unloaded)이면 다시 받는다 (보일 때만)
+  if (!ready && it.kind === 'video' && it.onScreen !== false && v.paused) ensureLoaded(it);
   if (!show) return;
   const f = currentFrame(it);
-  const key = `${f}|${it.onion}`;
+  const key = `${f}|${it.onion.b}|${it.onion.a}`;
   if (key === it.onionKey) return;
   it.onionKey = key;
   renderOnion(it, f, (it.onionGen = (it.onionGen || 0) + 1));
@@ -96,12 +180,14 @@ async function renderOnion(it, f, gen) {
   const cur = gpu ? src : grab(src, W, H);
   if (!cur) return;
   const total = it.kind === 'gif' ? it.media.frameCount : totalFrames(it);
-  const n = it.onion;
+  const { b, a } = it.onion;
   // 먼 프레임부터 (가까운 프레임이 위에 오게). 하나 읽을 때마다 다시 합쳐 보여 준다
   const ghosts = [];
   const out = gpu ? null : ctx.createImageData(W, H);
-  for (let d = n; d >= 1; d--) {
+  for (let d = Math.max(b, a); d >= 1; d--) {
     for (const dir of [-1, 1]) {
+      const n = dir < 0 ? b : a;
+      if (d > n) continue;
       const i = f + dir * d;
       if (i < 0 || i >= total) continue;
       const bmp = await onionFrame(it, i, W, H);
@@ -243,7 +329,7 @@ async function onionFrame(it, i, W, H) {
     return null;
   }
   it.onionFrames.set(i, img);
-  while (it.onionFrames.size > ONION_CACHE) {
+  while (it.onionFrames.size > onionCacheSize(it)) {
     const [k, old] = it.onionFrames.entries().next().value;
     it.onionFrames.delete(k);
     old.close();

@@ -1018,7 +1018,7 @@ async function addItem(opts) {
     it.y -= it.h / 2;
   }
   buildItemEl(it);
-  if (opts.onion) setOnion(it, opts.onion);
+  if (opts.onion) setOnion(it, opts.onion, { remember: false });
   app.items.set(it.id, it);
   boardChanged(it, 1);
   layoutAll();
@@ -1339,13 +1339,14 @@ function buildControls(it) {
     changeSpeed(it, e.deltaY < 0 ? 1 : -1);
   };
   row.append(c.speed);
-  c.onion = btn('onion', tr('어니언 스킨 - 멈췄을 때 앞뒤 프레임 겹쳐 보기 (K)'), () => toggleOnion(it), 'onionbtn');
+  c.onion = btn('onion', tr('어니언 스킨 - 멈췄을 때 이전 · 다음 프레임 겹쳐 보기 (K) · 켜져 있으면 눌러서 프레임 수'), () => onionButton(it), 'onionbtn');
   c.sync = btn('link', '', () => toggleSync(it), 'sync'); // Blender 와 연결됐을 때만 보인다 (CSS)
   if (it.kind === 'gif') c.frames = btn('frames', tr('모든 프레임 보기 (G) - 프레임을 누르면 그 프레임으로'), () => toggleFrames(it), 'framesbtn');
   else c.mute = btn('mute', tr('소리 켜기 / 끄기 (M)'), () => toggleMute(it), 'mutebtn');
 
   c.strip = h('div', 'segstrip');
   bar.append(scrub, row, c.strip, c.menu);
+  buildOnionMenu(it, bar);
   updateSpeedBtn(it);
   updateLoopUi(it);
   queueMicrotask(() => renderSegments(it));
@@ -1730,9 +1731,7 @@ function itemMenu(ev, it) {
     if (it.kind === 'gif') items.push({ label: v.grid ? tr('모든 프레임 보기 끄기') : tr('모든 프레임 보기'), icon: 'frames', hint: 'G', action: () => toggleFrames(it) });
     else items.push({ label: it.muted ? tr('소리 켜기') : tr('소리 끄기'), icon: it.muted ? 'vol' : 'mute', hint: 'M', action: () => toggleMute(it) });
     items.push({ label: tr('어니언 스킨 (앞뒤 프레임 겹쳐 보기)'), icon: 'onion', hint: 'K', checked: !!it.onion, action: () => toggleOnion(it) });
-    if (it.onion) {
-      for (const n of ONION_COUNTS) items.push({ label: tr('앞뒤 {0}프레임', n), checked: it.onion === n, action: () => setOnion(it, n) });
-    }
+    items.push({ label: it.onion ? tr('어니언 스킨 프레임 수… (이전 {0} · 다음 {1})', it.onion.b, it.onion.a) : tr('어니언 스킨 프레임 수…'), icon: 'onion', action: () => openOnionMenu(it) });
     items.push('sep');
   }
   if (app.linked && isTimed(it)) {
@@ -1913,7 +1912,7 @@ function initBoard() {
 
   window.addEventListener('resize', layoutAll);
   // 속도 목록 바깥을 누르면 닫기
-  window.addEventListener('pointerdown', (e) => !e.target.closest('.menu, .speed') && closeMenus(), true);
+  window.addEventListener('pointerdown', (e) => !e.target.closest('.menu, .speed, .onionbtn') && closeMenus(), true);
 }
 
 function fitView() {
