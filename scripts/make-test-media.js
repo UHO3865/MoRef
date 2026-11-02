@@ -10,6 +10,7 @@
 //   thumbtest/ fadein.mp4     검게 시작 (썸네일은 1초 지점으로)
 //              broken.mp4     깨진 파일 (실패를 기억)
 //              vardelay.gif   프레임 길이 50,100,…,400ms (8장, 1.8초)
+//              big.gif        4MB 넘는 GIF (NAS 프록시가 끝까지 보내는지)
 //              quad.png       왼쪽 위 빨강 · 오른쪽 위 초록 · 왼쪽 아래 파랑 · 오른쪽 아래 흰색
 //   fpstest/ f24.mp4 f2997.mp4 f60.mp4 f25.webm   프레임 n 의 밝기 Y = 16 + 7·(n mod 30)
 const fs = require('fs');
@@ -55,6 +56,9 @@ console.log('   thumbtest/broken.mp4');
   const join = colors.map((_, i) => `[c${i}]`).join('') + `concat=n=${colors.length}:v=1:a=0,mpdecimate=hi=1:lo=1:frac=1,split[a][b];[a]palettegen[p];[b][p]paletteuse`;
   ff(['-filter_complex', `${parts};${join}`, '-fps_mode', 'passthrough', '-final_delay', '40', '-loop', '0'], path.join(out, 'thumbtest', 'vardelay.gif'));
 }
+
+// 4MB 넘는 GIF: 프록시가 범위 없는 요청에도 끝까지 보내는지 (예전에는 앞 4MB 만 보내 "Unexpected end of image")
+ff(['-f', 'lavfi', '-i', 'testsrc2=s=960x540:r=15:d=14', '-vf', 'split[a][b];[a]palettegen=stats_mode=diff[p];[b][p]paletteuse=dither=bayer'], path.join(out, 'thumbtest', 'big.gif'));
 
 ff(
   ['-filter_complex', 'color=c=red:s=160x90[a];color=c=0x00FF00:s=160x90[b];color=c=blue:s=160x90[c];color=c=white:s=160x90[d];[a][b]hstack[t];[c][d]hstack[u];[t][u]vstack', '-frames:v', '1'],

@@ -57,8 +57,9 @@ function serveFile(req, res, full) {
 // NAS 에서는 4MB 씩 짧게 받아 바로 메모리로 읽고, 그다음 요청에 같은 연결을 다시 쓴다.
 // 어떤 NAS 는 로그인한 연결을 한 번에 하나만 받아서(두 번째 연결은 첫 연결이 닫힐 때까지 기다림),
 // 받는 쪽(<video>, ffmpeg)이 천천히 읽으며 연결을 붙잡고 있으면 다른 요청이 수십 초씩 멈춘다.
-//  * 화면(<video>): 요청한 범위의 첫 조각만 돌려준다. 나머지는 브라우저가 이어서 다시 요청한다.
-//  * 그 밖(ffmpeg 등): 조각을 이어 붙여 요청한 범위를 통째로 돌려준다 (조각 사이에 연결은 비어 있다).
+//  * 화면의 범위 요청(<video>): 요청한 범위의 첫 조각만 돌려준다. 나머지는 브라우저가 이어서 다시 요청한다.
+//  * 그 밖(ffmpeg, 화면의 범위 없는 요청 - GIF · 미리 보기 <img>): 조각을 이어 붙여 요청한 범위를 통째로 돌려준다
+//    (조각 사이에 연결은 비어 있다).
 //    ffmpeg 는 썸네일 하나에 필요한 양(색인 + 프레임 몇 개)보다 훨씬 많이 미리 읽어 버려서, 조각을 작게 한다.
 //    1GB 영상 측정: 4MB 조각이면 썸네일 하나에 20~40MB, 1MB 면 7~16MB (속도는 같음). 256KB 는 요청이 많아 오히려 느렸다.
 const CHUNK = 4 * 1024 * 1024;
@@ -122,7 +123,10 @@ async function serveDav(req, res, src, rel) {
     const total = Number(/\/(\d+)$/.exec(first.headers['content-range'] || '')?.[1]);
     if (!Number.isFinite(total)) throw new Error('Content-Range 없음');
     end = Math.min(end, total - 1);
-    if (browser) end = start + first.body.length - 1; // 화면: 첫 조각만
+    // 화면의 범위 요청(<video>): 첫 조각만 - 나머지는 영상이 이어서 다시 요청한다.
+    // 범위 없는 요청(GIF 플레이어의 fetch, 미리 보기 <img>)은 다시 요청하지 않으므로 끝까지 이어서 보낸다
+    // (예전에는 이것도 첫 4MB 만 "200 전부" 로 보내서 4MB 넘는 GIF 가 "Unexpected end of image" 로 멈췄다)
+    if (browser && partial) end = start + first.body.length - 1;
     const len = end - start + 1;
     res.writeHead(partial ? 206 : 200, {
       ...out,

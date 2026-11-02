@@ -17,7 +17,7 @@ MoRef 는 따로 띄운 데스크톱 창 그대로 쓰고(항상 위 / 투명도
 bl_info = {
     "name": "MoRef 연결",
     "author": "MoRef",
-    "version": (0, 5, 0),
+    "version": (0, 5, 1),
     "blender": (4, 2, 0),
     "location": "상단 바 MoRef 버튼 · Ctrl+Alt+R · 3D 뷰 사이드바(N) ▸ MoRef",
     "description": "데스크톱 MoRef 영상 레퍼런스 보드와 Blender 타임라인 / 구간 반복 / 재생 / 카메라 배경을 연결",
@@ -42,6 +42,7 @@ RETRY = 1.0  # 연결이 없을 때 다시 찾는 간격 (초)
 
 class _State:
     sock = None  # MoRef 연결 (양방향)
+    pending = None  # 거는 중인 연결 (소켓, 링크 정보, 건 시각) - _try_connect
     rbuf = b""
     next_try = 0.0
     last_sent = None  # 마지막으로 보낸 타임라인 상태
@@ -148,21 +149,99 @@ def _hello():
     _send("hello " + name)
 
 
+_k32 = None  # Windows kernel32 (_pid_alive)
+
+
+def _pid_alive(pid):
+    """링크 파일을 적은 MoRef 가 아직 살아 있는가 (모르면 True - 그때는 연결해 본다)"""
+    try:
+        pid = int(pid)
+    except (TypeError, ValueError):
+        return True
+    if not IS_WIN:
+        try:
+            os.kill(pid, 0)  # POSIX: 신호를 보내지 않고 있는지만 본다
+        except ProcessLookupError:
+            return False
+        except OSError:
+            return True
+        return True
+    import ctypes
+    from ctypes import wintypes
+
+    global _k32
+    if _k32 is None:  # 처음 한 번만 불러 둔다
+        _k32 = ctypes.WinDLL("kernel32", use_last_error=True)
+        _k32.OpenProcess.restype = wintypes.HANDLE
+        _k32.OpenProcess.argtypes = (wintypes.DWORD, wintypes.BOOL, wintypes.DWORD)
+        _k32.GetExitCodeProcess.argtypes = (wintypes.HANDLE, ctypes.POINTER(wintypes.DWORD))
+        _k32.CloseHandle.argtypes = (wintypes.HANDLE,)
+    k32 = _k32
+    h = k32.OpenProcess(0x1000, False, pid)  # PROCESS_QUERY_LIMITED_INFORMATION
+    if not h:
+        return ctypes.get_last_error() == 5  # 접근 거부 = 있기는 하다. 그 밖(87 등) = 없다
+    try:
+        code = wintypes.DWORD()
+        if not k32.GetExitCodeProcess(h, ctypes.byref(code)):
+            return True
+        return code.value == 259  # STILL_ACTIVE
+    finally:
+        k32.CloseHandle(h)
+
+
+CONNECT_WAIT = 2.0  # 연결을 걸어 두고 기다리는 최대 시간 (초)
+
+
 def _try_connect():
+    """MoRef 에 접속한다. Blender 를 멈추지 않게 기다리지 않는다:
+    연결을 걸어 두고(논블로킹) 다음 확인(TICK) 때 됐는지만 본다.
+    예전에는 0.3초까지 기다리며 접속했는데, MoRef 가 비정상 종료해 링크 파일만 남으면 Windows 는 닫힌 포트도
+    바로 거절하지 않아서 1초마다 0.3초씩 Blender 가 멈췄다 (연결 안 됐을 때 계속 프레임 드랍)."""
     now = time.monotonic()
+    if S.pending is not None:
+        _check_pending(now)
+        return
     if now < S.next_try:
         return
     S.next_try = now + RETRY
     try:
         with open(_link_file(), encoding="utf8") as f:
             info = json.load(f)
-        sock = socket.create_connection(("127.0.0.1", int(info["port"])), timeout=0.3)
+        port = int(info["port"])
     except (OSError, ValueError, KeyError):
         return  # MoRef 가 꺼져 있다
+    if not _pid_alive(info.get("pid")):
+        return  # 링크 파일만 남았다 (MoRef 가 비정상 종료) - 접속하지 않는다
+    sock = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
+    sock.setblocking(False)
+    rc = sock.connect_ex(("127.0.0.1", port))
+    if rc not in (0, 10035, 115, 36, 150):  # 0 / WSAEWOULDBLOCK / EINPROGRESS (Linux, macOS) / Windows 의 EINPROGRESS 계열
+        sock.close()
+        return
+    S.pending = (sock, info, now)
+    _check_pending(now)
+
+
+def _check_pending(now):
+    sock, info, started = S.pending
     try:
-        sock.sendall(f"auth {info['token']}\n".encode())
+        _r, w, x = select.select([], [sock], [sock], 0)
+    except (OSError, ValueError):
+        w, x = [], [sock]
+    if not w and not x:
+        if now - started > CONNECT_WAIT:
+            S.pending = None
+            sock.close()
+        return
+    S.pending = None
+    if x or sock.getsockopt(socket.SOL_SOCKET, socket.SO_ERROR) != 0:
+        sock.close()
+        return
+    try:
+        sock.setblocking(True)
         sock.settimeout(0.05)  # Blender 가 멈추지 않도록 짧게
-    except OSError:
+        sock.sendall(f"auth {info['token']}\n".encode())
+    except (OSError, KeyError):
         sock.close()
         return
     S.sock = sock
@@ -647,6 +726,9 @@ def register():
 def unregister():
     if bpy.app.timers.is_registered(_tick):
         bpy.app.timers.unregister(_tick)
+    if S.pending is not None:
+        S.pending[0].close()
+        S.pending = None
     _close_sock()
     for km, kmi in _keymaps:
         try:
